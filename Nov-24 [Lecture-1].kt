@@ -108,6 +108,7 @@ fun fact(n: Int): Int {
 }
 
 // Write a recursive function fib() to calculate the nth Fibonacci number
+    // existing function is tail-recursive and O(n)
 fun fib(n: Int): Int {
     if (n == 1 || n == 2) return 1
     fun go(x: Int, y: Int, n: Int): Int {
@@ -117,8 +118,54 @@ fun fib(n: Int): Int {
     return go(1, 1, n-2)
 }
 
+// more compact version
+    /*
+    - Added ```tailrec``` keyword. This tells the compiler to optimize the tail
+      recursion into a loop, guaranteeing no stack overflow.
+    - Simplified the base case logic by starting with ```k = n - 1```
+    - Used expression body with ```if/else``` instead of block body with
+      ```return```
+     */
+fun fibCompact(n: Int): Int {
+    tailrec fun go(a: Int, b: Int, k: Int): Int =
+        if (k == 0) a else go(b, a + b, k -1)
+    return go(1, 1, n - 1)
+}
 
+/* -------- -------- -------- -------- -------- -------- -------- -------- */
+
+// String
+    /*
+    - Write a function that takes a String argument called name and return Hello
+      name
+        - Make first letter of name uppercase
+     */
+fun helloName(name: String): String =
+    "Hello " + name[0].uppercaseChar() + name.substring(1)
+
+    /*
+    - Write a function that returns "Hello", "world" or "Hello World" depending
+      on what the first letter of the argument is
+     */
+fun stringMan(str: String): String =
+    when {
+        str[0] == 'j' -> "hello"
+        str[1] == 'a' -> "bruh"
+        else -> "nope"
+    }
 
 fun main() {
     println(successor(2)) // function call
 }
+
+/*
+Defining Functions review
+
+- Function declarations
+    - Arguments
+    - Return types
+    - Expressions vs block bodies
+- Common Basic (native) types
+    - Integer, Double, Boolean, String, Pair, List
+- String manipulation
+ */
