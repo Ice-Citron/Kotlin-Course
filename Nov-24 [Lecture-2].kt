@@ -281,9 +281,218 @@ fun isPalindrome4(str: String) = str == str.reversed()
 
 
 /* ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ */
+// LISTS
+/* ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ */
+
+/*
+    - Lists can be created with the listOf method
+    - List types are defined as List<T>
+    - Access elements with [index] or get()
+    - What would be the type of points?
+        `List<Pair<Int, Int>>`
+        The `to` keyword creates a `Pair`, so `1 to 3` is `Pair(1, 3)`. A list
+        of those pairs gives you `List<Pair<Int, Int>>`
+ */
+
+val nums: List<Int> = listOf(1, 2, 3, 4, 5, 6)
+
+val points = listOf(
+    1 to 3,
+    2 to 4,
+    5 to 6,
+    7 to 10
+)
+
+
+// FUNCTION VARIABLES
+    // Write a function square in threee different ways
+
+// declaring a conventional function
+fun square(x: Int): Int = x * x
+
+// declaring a function as an object
+val square2: (Int)->Int = fun(x: Int): Int = x * x
+
+// declaring a function as an object with anonymous shorthand
+val square3 = { x: Int -> x * x }
+
+
+// LISTS WITH MAP
+    /*
+    Functions can be aplied to the contents to lists with `map`. Apply a square
+    function to the list nums.
+        - Three alternatives for passing a function
+        - Function as a val? Note the function type
+     */
+val nums2: List<Int> = listOf(1, 2, 3, 4, 5, 6)
+
+fun printSquare() {
+    println(nums2.map( ::square ))
+    println(nums2.map { x -> x * x})
+    println(nums2.map( {x -> x * x} ))
+}
+
+
+// LISTS WITH FILTER
+    /*
+        Write a function that takes an integer and a list of pairs then returns
+        only the pairs that sum to the given value.
+     */
+fun matchingTotal(x:Int, pairs:List<Pair<Int, Int>>):List<Pair<Int,Int>> =
+    pairs.filter({ pair -> pair.first + pair.second == x })
+
+
+// HoFs (Higher-order Functions) and Composition
+    /*
+        Write a function composition that takes two functions and returns
+        a function of their product. Use square functions to create a power4.
+     */
+fun composition(f: (Int)->Int, g: (Int)->Int): (Int)->Int = { x -> f(g(x)) }
+
+val power4: (Int)->Int = composition(square2, square3)
+
+val power8 = composition( power4, ::square)
+
+/* ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ */
+
+// Just writing a function here to store all notes related to loops
+fun forLoop() {
+    // For the range:
+    var fl1 = (1..5).toList()   // [1, 2, 3, 4, 5]
+    println(fl1)
+
+    // Or just use the range directly:
+    for (i in 1..5) println(i)
+
+    // Other variations
+    var fl2 = (1 until 5).toList()      // [1, 2, 3, 4] -- excludes end
+    var fl3 = (1..10 step 2).toList()   // [1, 3, 5, 7, 9]
+    var fl4 = (5 downTo 1).toList()     // [5, 4, 3, 2, 1]
+
+    // On `to`:
+        // Yes, it just creates a `Pair`. That's literally all it does:
+    val p = 1 to 3      // Pair(1, 3)
+    println(p.first)    // 1
+    println(p.second)   // 3
+
+    /*
+        It's syntactic sugar--`1 to 3` is equivalent to `1.to(3)` which returns
+        `Pair(1, 3)`. It's commonly used for maps:
+     */
+    val map = mapOf("ac" to 1, 'b' to 2, 'c' to 3)
+    println(map)
+}
+
+
+// `::` is the FUNCTION REFERENCE operator. It lets you refer to a function
+// without calling it.
+fun cube(x: Int): Int = x * x * x
+
+// These are equivalent
+/*
+nums.map { x -> square(x) }     // lambda that calls square
+nums.map(::square)              // references to square directly
+ */
+
+// So `::square` means "the function itself" rather than "call square now."
+
+// different uses:
+/*                      // try run these in main() if needed
+
+// Reference a top-level function
+::square                // refers to fun square(...)
+
+// References a class method
+"hello"::length         // refers to length of that specific string
+
+// Reference a constructor
+::Person                // refers to Peson constructor
+
+// Reference a member function
+String::length  `       // refers to length on any String
+ */
+
+/*
+        Analogy to Haskell:
+        - It's similar to how in Haskell you can write `map square [1, 2, 3]`
+          passing `square` directly. In Kotlin you need the `::` to disambiguate
+          that you mean the function reference, not a function call.
+
+
+The point is that `::` captures a function reference that you can store, pass
+around, or call later. It's lke grabbing a handle to the function itself.
+
+val f = "hello"::reversed           // grab reference
+println(f())                        // call via reference
+
+The reference approach is useful when you want to pass the function to something
+like `,map`, `filter`, etc.
+ */
+
+/* ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ */
+// EXERCISES 3
+/* ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ */
+// HIGHER-ORDER FUNCTIONS IN KOTLIN
+
+/*
+    Kotlin includes a lot of powerful features from functional languages like
+    Haskell. One of the main featuyres that we think of as being characeristic
+    of a functional language is the ability to use higher-order functions.
+ */
+
+
+// Syntax reminder:
+    /*
+    Here's a reminder of two different ways of passing a function as an argument
+    to another function, either by function reference (double-colon), or by
+    passing a lambda - an anonymous function declared in braces.
+     */
+fun square4(x: Int): Int = x * x
+
+/*
+fun main() {
+    val numbers = listOf(1, 2, 3, 4, 5, 6, 7, 8)
+        // or `val numbers = (1..8).toList()`
+
+    // passing a function reference
+    val squares5 = numbers.map(::square4)
+
+    // passing a lambda
+    val squares6 = numbers.map { x: Int-> x * x}
+        // or val squares6 = numbers.map { x -> x * x}
+}
+ */
+
+
+// Write a function `lengths()` that takes a list of strings and returns a
+// list of their lengths
+fun lengths(xs: List<String>): List<Int> = xs.map({ s -> s.length})
+
+// Write a function `complements()` that takes a list of integers, and returns
+// a list of pairs, where each pair contains the input number as the first
+// element, and the total of the numbers in the pair makes 10.
+fun complements(xs: List<Int>): List<Pair<Int, Int>> =
+    xs.map { s -> Pair(s, (10 - s)) }
+    // xs.map({ s -> s to (10 - s) })       // or alternatively
+
+// Write a function `matchingTotal(x, pairs)` that takes a total, and list of
+// pairs of integers, returning a list containing only those pairs where the
+// sum of the elements of the pair matches the given total. If the x = 10, then
+// (4, 6) would be included, but (6, 6) would be excluded.
+val pairs = listOf(Pair(1, 9), Pair(3, 4), Pair(5, 5))
+
+
+
+
+/* ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ */
 
 fun main() {
     println("123456".dropLast(3))
+
+    println(::square)                   // function square (Kotlin reflection is not available)
+    println("hello"::length)            // property length (Kotlin reflection is not available)
+
+    // printSquare()
     // println(distanceBetween(Pair(3, 2), Pair(5, 20)))
 
     // println(5.squared())
