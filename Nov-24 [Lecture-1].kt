@@ -54,7 +54,69 @@ fun difference(x: Int, y: Int): Int {
 }
 
 
-//
+// When conditional logic
+    /*
+    - Write a function to return the signature of an integer
+    - Note
+        * The arrow -> operator
+        * The necessary else
+        * Single expression function
+        * The (lack of) styling
+     */
+fun signum(x: Int): Int =
+    when {
+        x > 0 -> 1
+        x < 0 -> -1
+        else  -> 0
+    }
+
+
+// Block body
+    // Write a function to calculate the number of turns of a measuring wheel
+    // per a given distance
+fun turns(start: Double, end: Double, radius: Double): Double {
+    val kmToM = 1000
+    // val distance = (end-start)*kmToM
+    return (end - start)*kmToM / (2 * PI * radius)
+}
+
+/* -------- -------- -------- -------- -------- -------- -------- -------- */
+
+// EXERCISES
+
+fun bigger(x: Int, y: Int): Int =
+    when {
+        x > y -> x
+        y > x -> y
+        else  -> x // or y, because they're equal
+    }
+
+// or more simply
+fun bigger2(x: Int, y: Int): Int =
+    when {
+        x >= y -> x
+        else   -> y
+    }
+
+fun biggestOfThree(x: Int, y: Int, z: Int): Int {
+    return bigger(bigger(x, y), z)
+}
+
+fun fact(n: Int): Int {
+    if (n == 0) return 1
+    else        return n * fact(n-1)
+}
+
+// Write a recursive function fib() to calculate the nth Fibonacci number
+fun fib(n: Int): Int {
+    if (n == 1 || n == 2) return 1
+    fun go(x: Int, y: Int, n: Int): Int {
+        if (n == 0) return y
+        else return go(y, x+y, n-1)
+    }
+    return go(1, 1, n-2)
+}
+
 
 
 fun main() {
