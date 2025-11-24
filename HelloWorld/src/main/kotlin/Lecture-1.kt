@@ -1,3 +1,6 @@
+package HelloWorld.src.main.kotlin
+
+
 import kotlin.math.PI
 
 // Kotlin function declaration
@@ -48,6 +51,8 @@ fun turns(start: Double, end: Double, radius: Double): Double {
     return distance/(PI*radius*2);
 }
 
+
+
 // String
 /*
 * Write a function that takes a String argument called name and return Hello
@@ -57,6 +62,7 @@ fun turns(start: Double, end: Double, radius: Double): Double {
 fun helloName(name: String): String {
     return "Hello " + name[0].uppercaseChar() + name.substring(1)
 }
+
 
 // String
 /*
@@ -91,6 +97,7 @@ fun main() {
     println(stringMan("Joanna")) // returns "Lame"  <-- because 'a' /= 'A'
     println(stringMan("JoannA"))
 }
+
 
 // Defining Functions review
 /*
