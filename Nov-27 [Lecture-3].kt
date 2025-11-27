@@ -742,9 +742,28 @@ val x = p7.x
 val y = p7.y
 
 // You can write:
-val (x1, y1) = p7    // writing x1 instead of x because ran out of names. lol
+/*
+fun main() {
+    val (x1, y1) = p7   // writing x1 instead of x because ran out of names. lol
+                        // also seems that destructuring is only possible in
+                        // main function... because it's deemed as a local var
+
+    // useful in loops:
+    val points = listOf(Point(1, 2), Point(2, 3), Point(3, 4))
+
+    for ((x, y) in points) {
+        println("x=${x}, y=${y}")
+    }
 
 
+    // and with maps:
+    val scores = mapOf("Alice" to 95, "Bob" to 87) // creates pairs
+
+    for ((name, score) in scores) {
+        println("${name} scored ${score}.")
+    }
+}
+ */
 
 // ABOUT COMPONENT100() IN `data class`
 /*
@@ -775,9 +794,94 @@ val (x1, y1) = p7    // writing x1 instead of x because ran out of names. lol
  */
 
 
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ---- */
+// C-Style Macros in Kotlin
+
+/*
+    Kotlin doesn't have C-style preprocesser macros (`#define`). This is
+    intentional--macros can make code hard to understand and debug.
+
+    But Kotlin has alternatives for the common use cases:
+ */
+
+// 1. Constants -- use `const val`
+
+/*
+    In C:
+        ```
+        #define MAX_SIZE 100
+        #define PI       3.14159
+        ```
+
+    In Kotlin:
+ */
+const val MAX_SIZE = 100
+const val PI       = 3.14159
 
 
+/*
+    `const val` is a compile-time constant. It must be a primitive or String,
+    and must be defined at the top level or in an object:
+ */
+// Top-level
+const val APP_NAME = "MyApp"
 
+// or in an object
+object Config2 {
+    const val MAX_RETRIES = 3
+    const val TIMEOUT_MS = 5000
+}
+
+/*
+fun main() {
+    println("${Config2.MAX_RETRIES} || ${Config2.TIMEOUT_MS}")
+}
+ */
+
+
+// 2. INLINE FUNCTIONS - FOR MACRO-LIKE CODE SUBSTITUTION
+/*
+    In C, macros can include code:
+        ```
+        #define SQUARE(x) ((x) * (x))
+        ```
+
+    In Kotlin, use `inline fun`:
+ */
+const val DEBUG_MODE = true
+
+inline fun debug(message: () -> String) {
+    if (DEBUG_MODE) println("[DEBUG]: ${message()}")
+}
+
+/*
+fun main() {
+    debug { "Current value: ${x}" } // lambda not even created if DEBUG_MODE is
+                                    // false
+}
+ */
+
+
+// 3. Type aliases -- for macro-like type shorthand
+/*
+    In C:
+        ```
+        #define uint unsigned int
+        ```
+
+    In Kotlin:
+ */
+typealias uint = UInt
+
+
+// 4. COMPILE-TIME CONDITIONS -- LIMITED SUPPORT
+/*
+    C has `#ifdef` for conditional compilation. Kotlin doesn't have direct
+    equivalents, but you can use:
+ */
+
+// Build variants (in Android/Gradle)
+if
 
 
 
