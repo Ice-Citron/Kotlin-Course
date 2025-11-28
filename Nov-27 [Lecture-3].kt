@@ -1,3 +1,5 @@
+import javax.swing.text.rtf.RTFEditorKit
+
 // Intended Learning Outcomes
 /*
     - Types
@@ -881,11 +883,464 @@ typealias uint = UInt
  */
 
 // Build variants (in Android/Gradle)
-if
+/*
+fun main() {
+    if (BuildConfig.DEBUG) {
+        // debug-only code
+    }
+
+    // Or platform checks in multiplatform
+    // expect fun platformName(): String       // defined differently per platform
+}
+ */
 
 
 
+/*
+    Summary
+    - `data class`
+        - Auto-generates equals, hashCode, toString, copy, destructuring
+    - `copy()`
+        - Creates new instance with some fields changed (immutability pattern)
+    - `const val`
+        - Compile-time constants (replaces `#define` for values)
+    - `inline fun`
+        - Inlines function body at call site (replaces #define for code)
+ */
 
+
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+// Kotlin actually does have multiple constructors and visibility control--it
+// just looks different from C++.
+
+
+// PRIMARY CONSTRUCTOR
+/*
+    The one in the class header is the primary constructor:
+ */
+class Human(val name: String, val age: Int)
+
+/*
+    This is just shorthand. In C++ terms you'd write
+        ```cpp
+        class Person {
+        public:
+            string name;
+            int age;
+
+            Person(string name, int age) : name(name), age(age) {}
+        };
+        ```
+
+    Kotlin collapses all that into one line.
+ */
+
+
+// SECONDARY CONSTRUCTORS
+/*
+    You can have additional constructors using the `constructor` keyword:
+ */
+class Human2(val name: String, val age: Int) {      // Primary Constructor
+
+    // Secondary constructor-must call primary constructor
+    constructor(name: String) : this(name, 0) {
+        println("[LOG]: Created person with unknown age.")
+    }
+
+    constructor() : this("UNKNOWN", 0) {
+        println("[LOG]: Created anonymous person")
+    }
+}
+
+val h1 = Human("Alice", 25)
+val h2 = Human2("Alice")
+val h3 = Human2()
+
+/*
+    The rule: secondary constructors must eventually call the primary
+    constructor (via `this(...)`). This ensures the primary constructor's logic
+    always runs.
+ */
+
+
+// INIT BLOCKS
+/*
+    For compelx initialization logic, use `init`:
+ */
+class HumanL(val name: String, val age: Int) {
+
+    init {
+        require(age >= 0) { "Age can't be negative" }
+    }
+
+    init {
+        // Can have multiple init blocks-run in order
+        println("[LOG]: Another init block")
+        println("[LOG]: `HumanL` created with name=\"${this.name}\" and " +
+                        "age=${this.age}.")
+    }
+}
+/*
+    Init blocks run after the primary constructor, in the order they appear.
+ */
+
+
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+// VISBILITY ON CONSTRUCTORS
+
+/*
+    You can make constructors private, protected, etc.:
+ */
+// Private constructors--can't instaniate from outside
+class Singleton private constructor(val value: Int) {
+    companion object {
+        val instance = Singleton(42)
+    }
+}
+
+// Singleton.instance           // works
+// Singleton(10)                // ERROR! Constructor is Private
+
+
+// Protected constructor--only subclasses can call it
+open class Base protected constructor(val x: Int)
+
+class Derived : Base(10)     // OK-subclass can all it
+// val b = Base(5)              // ERROR! Can't call from outside.
+
+
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+// DEFAULT PARAMETERS
+
+/*
+    In Kotlin, default parameters handle this:
+ */
+class Rectangle(val width: Int = 0, val height: Int = width)
+
+val r1: Rectangle = Rectangle()             // 0, 0
+val r2: Rectangle = Rectangle(5)     // 5, 5 (square
+
+
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+// FACTORY PATTERN WITH COMPANION OBJECT
+/*
+    Sometimes you want named "constructors" that describe what they create. Use
+    companion object functions:
+ */
+class Color2 private constructor(val r: Int, val g: Int, val b: Int) {
+
+    companion object {
+        fun fromRGB(r: Int, g: Int, b: Int): Color2 = Color2(r, g, b)
+
+        fun fromHex(hex: String): Color2 {
+            val r = hex.substring(0, 2).toInt(16)
+            val g = hex.substring(2, 4).toInt(16)
+            val b = hex.substring(4, 6).toInt(16)
+            return Color2(r, g, b)
+        }
+
+        // Predefined instances
+        val RED   = Color2(255, 0, 0)
+        val GREEN = Color2(0, 255, 0)
+        val BLUE  = Color2(0, 0, 255)
+    }
+}
+
+val c1 = Color2.fromRGB(100, 150, 200)
+val c2 = Color2.fromHex("FF5733")
+val c3 = Color2.RED
+// Color2(1, 2, 3)      // ERROR! Constructor is private.
+
+/*
+    This gives you descriptive "constructors" while hiding the real one.
+ */
+
+
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+// SUMMARY
+/*
+    Kotlin has everything C++ has, just organized differently:
+
+        - Multiple constructor overloads
+            - Default parameters + Secondary constructors
+        - Initializer lists
+            - Primary constructor + init blocks
+        - Private/protected constructors
+            - Same--`private constructor(...)`
+        - Static factory methods
+            - Companion object functions
+
+    The design philosophy: reduce boilerplate. Default parameters eliminate 80%
+ */
+
+
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+// EVERYTHING IS AN OBJECT
+
+/*
+    In Kotlin, there are no "primitives" like in C++ or Java. Everything is an
+    object, including numbers.
+ */
+
+
+
+// THE ANY CLASS
+/*
+    `Any` is the root of Kotlin's class hierarchy--every class inherits from it.
+    It's like `Object` in Java.
+
+        ```kotlin
+        open class Any {
+            open fun equals(other: Any?): Boolean
+            open fun hashCode(): Int
+            open fun toString(): String
+        }
+        ```
+ */
+
+fun printAnything(value: Any) {
+    println(value.toString())
+}
+
+// printAnything(42)
+// printAnything("hello")
+// printAnything(listOf(1, 2, 3))
+
+/*
+    Breakdown of the hierarchy:
+
+    1. Hierarchy
+        - `Any` (No question mark): This is the parent of every object in Kotlin
+                    It can hold a String, an Int, a User, a Circle, etc. But it
+                    cannot hold `null`.
+        - `Any?` (With question mark): This is the parent of `Any` and `null`.
+                    It is the absolute top of the Kotlin universe.
+
+    2. Why is it used in `equals`?
+        - In your screenshot, the method signature is `equals(other: Any?)`
+
+        - This is done on purpose for safety. If you have a `User` object, you
+          want to be able to ask: "Is this User equal to null?"
+          - If the signature was `equals(other: Any)`: you could never check
+            against null. `user.equals(null)` would be a compilation error.
+          - Because the singature is `equals(other: Any?)`: you are allowed to
+            pass `null` into the function. The function will just return `false`
+            (instead of crashing or throwing an error).
+
+    3. The "Box" Analogy
+        - Think of variables as boxes.
+            - `val x: Any` -> An infinite box that can hold any physical object,
+              but the box is never allowed to be empty.
+            - `val x: Any?` -> An infinite box that can hold any physical
+              object, OR it can be empty.
+
+
+ */
+
+
+// `val` VS `var` WITH OBJECTS
+/*
+    For objects, `val` means you can't reassign the reference, but you can still
+    mutate the object's contents.
+ */
+
+
+
+// NOTHING AND UNIT
+/*
+    Two special types at the botom:
+ */
+
+// Unit = "no meaningful value" (like void)
+fun greet(): Unit {
+    println("Hello")
+}
+
+// Nothing = "never returns" (function throws or loops forever)
+fun fail(): Nothing {
+    throw Exception("Failed")
+}
+
+/*
+        Any
+         │
+    (all types)
+         │
+       Unit     (single value, represents "no value")
+         │
+      Nothing   (no values, represents "never happens")
+
+ */
+
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+// OVERRIDE AND OVERLOADING
+
+/*
+    These are two different concepts that sound similar:
+    - Override: Replacing a method you inherited from a parent class
+    - Overload: Creating multiple versions of the same operator/method for
+      different types
+ */
+
+
+// OVERRIDING `toString()`
+/*
+    Every class inherits from `Any`, which has a `toString()` method. By
+    default, it prints something useless:
+ */
+class PointO(val x: Int, val y: Int)
+
+val pO = PointO(3, 4)
+
+class pointO2(val x: Int, val y: Int) {
+    override fun toString(): String = "Point at [x: ${this.x}, y: ${this.y}]"
+}
+
+val pO2 = pointO2(4, 5)
+
+/*
+    The `override` keyword is required--it tells Kotlin you're intentionally
+    replacing the parent's method. If you misspell the method name, Kotlin will
+    error rather than silently creating a new method.
+ */
+
+/*
+fun main() {
+
+    println(pO)      // Point@3a82f6ef -- memory address, not helpful
+    println(pO2)
+
+    val hl1 = HumanL("Sienar Jaemus", 12005)
+}
+ */
+
+
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+// OPERATOR OVERLOADING
+
+class PointO3(val x: Int, val y: Int) {
+    operator fun plus(p: PointO3): PointO3 = PointO3(this.x + p.x,
+                                                     this.y + p.y)
+    operator fun minus(p: PointO3): PointO3 = PointO3(this.x - p.x,
+        this.y - p.y)
+    operator fun times(scale: Int): PointO3 = PointO3(this.x * scale,
+        this.y * scale)
+}
+
+
+// DESTRUCTURING WITH `componentN()`
+/*
+    Destructuring lets you unpack an object into separate variables:
+
+        ```kotlin
+        val (x, y) = somePoint
+        ```
+
+    For this to work, your class needs `component1()`, `component2()`, etc.
+        ```kotlin
+        class Point(val x: Int, val y: Int) {
+            operator fun component1(): Int = x
+            operator fun component2(): Int = y
+        }
+
+        val p = Point(3, 4)
+        val (a, b) = p      //  a = 3, b = 4 - calls component1(), component2()
+        ```
+
+    This is why `data class` is convenient--it generates these automatically:
+        ```kotlin
+        data class Point(val x: Int, val y: Int)
+        // component1(), component2() are auto-generated
+
+        val(x, y) = Point(3, 4)     // just works
+        ```
+ */
+
+
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+// FP vs OOP: MUTATION VS NEW OBJECTS
+/*
+    There are two philosophies for how methods should work:
+ */
+
+
+// 1. OOP style (mutate the object):
+class Circle(var x: Int, var y: Int, var radius: Int) {
+
+    fun translate(dx: Int, dy: Int) {
+        this.x += dx
+        this.y += dy
+    }
+
+    fun scaleBy(factor: Int) {
+        radius *= factor        //  modifies this object
+    }
+}
+
+/*
+```kotlin
+val c = Circle(0, 0, 5)
+c.translate(3, 4)       // c is now at (3, 4)
+c.scaleBy(2)            // c.radius is now 10
+```
+ */
+
+// THE ORIGINAL OBJECT CHANGED!
+
+
+
+// 2. FP style (return a new object):
+class Circle7(val x: Int, val y: Int, val radius: Int) {
+
+    fun translate(dx: Int, dy: Int): Circle7 {
+        return Circle7(this.x+dx, this.y+dy, this.radius)
+                                                        // new object
+    }
+
+    fun scaleBy(factor: Int): Circle7 {
+        return Circle7(this.x, this.y, this.radius * factor)
+                                                        // new object
+    }
+}
+
+/*
+```kotlin
+val c1 = Circle(0, 0, 5)
+val c2 = c1.translate(3, 4)     // c1 unchanged, c2 is new
+val c3 = c2.scaleBy(2)          // c2 unchanged, c3 is new
+
+println(c1.radius)      // still 5
+println(c3.radius)      // 10
+```
+ */
+
+
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+// WHY DOES THIS MATTER?
+
+/*
+    MUTABLE (OOP) APPROACH:
+        - Pros: Memory efficient--no new objects created.
+        - Cons: Hard to track what changed when. If you pass an object to a
+                function, it might modify it unexpectedly.
+ */
+
+/*
+    IMMUTABLE (FP) APPROACH:
+        - Pros: Safe--objects never change unexpectedly. Easy to reason about.
+        - Cons: Creates more objects (though usually this is fine)
+ */
+
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+
+fun main() {
+
+}
+
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
+/* ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- */
 
 
 
