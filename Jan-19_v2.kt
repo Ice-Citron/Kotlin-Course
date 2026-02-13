@@ -360,13 +360,73 @@ class ResizingArrayList_2<T> : ImperialMutableList2<T> {
 /*
     2. THE RULES: ALL OR NOTHING
 
-    The slide shows a compilation error: "Class `ReisizngArrayList` is not
+    The slide shows a compilation error: "Class `ResizingArrayList` is not
     abstract and does not implement abstract member..."
 
     - THE RULE: You cannot pick and choose. If the interface lists 5 methods,
       you must implement all 5 (unless you mark your class as `abstract`,
       passing the burden to a subclass).        <-- interesting... abstract class implementing interface... class also need to implement interface virtual functions
+    - PROPERTIES TOO: Notice the slide highlights that `size` was omitted. In
+      Kotlin, properties in interfaces are just methods in disguise
+      (`getSize()`), so they must be overridden too.
 
+    ----------
+
+
+    3. THE CLIENT CODE PAYOFF: MIXING TYPES
+
+    This is the "Why are we doing this?" slide. We define a function
+    `doesEitherContain` that accepts two `ImperialMutableList` objects.
+
+    - THE MAGIC: You can now pass a `ResizingArrayList` as the first argument
+      and a `SinglyLinkedList` as the second.
+    - WHY: Because both "signed the contract," the function doesn't care about
+      their internal structure (arrays vs pointers). It only cares that they
+      both have a `.contains()` method.
+
+    ANALOGY:
+    - HASKELL: `doesEitherContain :: Eq a => [a] -> [a] -> a -> Bool`. The
+      function works on any list-like thing.
+
+
+
+    ------------
+    4. THE TRAP: YOU CANNOT "MAKE" AN INTERFACE
+
+    The slide asks: "Does this work?"
+
+    ```Kotlin
+    val list = ImperialMutableList<T>()         // ERROR
+    ```
+
+    - THE ERROR: Interfaces have no constructors. They are concepts, not things.
+      You cannot create an "Animal"; you must create a "Dog" or a "Cat".
+    - THE FIX: You must instantiate a concrete class but you can store it in a
+      variable of the interface type.
+
+    ```Kotlin
+    val list: ImperialMutableList<String> = ResizingArrayList()
+    ```
+
+
+    ------------
+    SUMMARY OF THE "RULES OF THE ROAD"
+
+    RULE: SIGNING
+    KOTLIN: `class A : Interface`
+    C++ EQUIVALENT: `class A : public Base`
+
+    RULE: MARKING
+    KOTLIN: `override fun foo()`
+    C++ EQUIVALENT: `void foo() override;`
+
+    RULE: PROPERTIES
+    KOTLIN: `override val size: Int`
+    C++ EQUIVALENT: Virtual `getSize()` method
+
+    RULE: INSTANTIATING
+    KOTLIN: `Interface()` is ILLEGAL
+    C++ EQUIVALENT: `Base()` is illegal (if pure virtual)
 * */
 
 /*
