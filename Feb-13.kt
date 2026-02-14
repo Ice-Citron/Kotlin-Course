@@ -547,6 +547,429 @@ QUICK LOGIC CHECK (C++ Brain):
       Imagine we are building an app like Microsoft Word, or Google Docs. A
       document contains different elements:
          - TextBox: Has width, height, and text limit.
+         - Image: Has width, height, and filename.
+         - Menu: Has width, height, and options.
+
+      We need a `DocumentManager` class to store all these items and perform
+      calculations (like finding the tallest item on the page).
+
+
+
+   THE PROBLEM: DUPLICATION NIGHTMARE
+      Without an interface, our `DocumentManager` has to know the specific
+      details of every single class.
+
+
+
+      ...
+
+
+      We realise that despite their differences, `TextBox`, `Image`, and `Menu`
+      all share one common trait: THEY HAVE DIMENSIONS.
+
+      We define a contract that guarantees this.
+
+
+      THE INTERFACE:
+```Kotlin
+interface PageElement {
+    val width: Int
+    val height: Int
+}
+```
+
+
+
+   THE IMPLEMENTATION:
+   Now we update our classes to "sign" this contract. They use `override` to
+   prove they have these properties.
+```Kotlin
+// TextBox promises to have width and height
+class TextBox(
+    override val width: Int,
+    override val height: Int,
+    val maxChars: Int               // Specific to TextBox
+) : PageElement
+```
+
+
+   ...
+
+
+4. THE "AFTER" WORLD (POLYMORPHISM)
+   Now look at how clean `DocumentManager` becomes. It doesn't care about
+   TextBoxes or Images anymore. It only cares about `PageElement`.
+
+   1. SINGLE STORAGE
+```Kotlin
+class DocumentManager {
+    // One list to rule them all
+    private val pageElements = mutableSetOf<PageElement>()
+
+    // One method to add anything
+    fun addPageElement(element: PageElement) {
+        pageElements.add(element)
+    }
+}
+```
+
+
+
+
+2. UNIFIED LOGIC (POLYMORPHISM)
+   We can write `maxHeight` once.
+
+```Kotlin
+fun maxHeight(): Int {
+    // We map every item to its height.
+    // The compiler allows `it.height` becuase the Interface guarantees it exists
+    return pageElements.map { it.height }.max()
+}
+```
+
+    THE MAGIC:
+    When `it.height` runs:
+       - If `it` is a `TextBox`, it grabs the TextBox's height.
+       - ... grabs the Image's height.
+       - The code treats them uniformly. This behavior is called POLYMORPHISM.
+
+
+
+
+            Polymorphism is a core OOP concept where a single interface, method,
+            or operator can represent different underlying forms (data types or
+            classes). It allows objects of different classes to be treated as
+            instances of a common superclass, enabling specialised behavior
+            (overriding) or multiple signatures (overloading).
+
+
+   SUMMARY OF BENEFITS
+      1. SIMPLICITY: We replace 3 lists with 1. We replaced 9 comparison
+         functions with 1 generic one
+         (`tallerThan(a: PageElement, b: PageElement)`).
+      2. EXTENSIBILITY: If you invent a `Video` class tomorrow, you just make it
+         implement `PageElement`. You do NOT need to touch a single line of code
+         in `DocumentManager`. It will automatically work with `addPageElement`
+         and `maxHeight`.
+
+
+Let's finish L4 by covering DEFAULT METHODS and DEFAULT PROPERTIES (S 53-64).
+
+This section answers a critical question: What if I want to add a helper method
+to my Interface without breaking every single class that implements it?
+
+   1. DEFAULT METHODS (S 53-55)
+      Traditionally, interfaces only list abstract methods (no code). But Kotlin
+      allows you to provide a DEFAULT IMPLEMENTATION right inside the interface.
+
+      THE PROBLEM:
+      You realise every list needs an `isEmpty()` method.
+
+      If you add `fun isEmpty(): Boolean` to the interface, EVERY class
+      (`ResizingArrayList`, `SinglyLinkedList`) immediately breaks because they
+      haven't implemented it yet.
+
+
+   THE SOLUTION:
+      You write the code once in the interface. Since every list has a `size`
+      property, you can use that!
+
+```Kotlin
+interface ImperialMutableList<T> {
+    val size: Int
+
+    // Abstract method (Implementing classes MUST provide this)
+    fun add(element: T)
+
+    // Default method (Implementing classes CAN use this as-is)
+    fun isEmpty(): Boolean = size <= 0
+}
+```
+
+   Now, `ResizingArrayList` gets `isEmpty()` for free. It doesn't need to
+   change a single line of code.
+
+
+
+
+2. OVERRIDING DEFAULT METHODS FOR SPEED (S 56-57)
+   Sometimes, the "default" way of doing things is safe but SLOW.
+
+   EXAMPLE: `addAll`
+   We can write a generic `addAll` in the interface that just loops through the
+   other list and calls `add` for each item.
+```Kotlin
+// In the Interface
+fun addAll(other: ImperialMutableList<T>) {
+    for (i in 0..<other.size) add(other.get(i))     // Calls the abstract add() repeatedly
+}
+```
+
+   ...
+
+
+THE OPTIMISATION:
+   The `ResizingArrayList` class should OVERRIDE this default method because it
+   knows a secret shortcut: it can resize the array ONCE and copy everything
+   directly.
+
+
+```Kotlin
+// Inside ResizingArrayList
+override fun addAll(other: ImperialMutableList<T>) {
+    // 1. Calculate total size needed
+    val newSize = size + other.size
+
+    // 2. Resize ONCE if needed (Big efficiency win!)
+    if (newSize > elements.size) {
+        elements = elements.copyOf(max(newSize, 2 * elements.size))
+    }
+
+    // 3. Copy items directly
+    for (i in 0 until other.size) {
+        elements[size + i] = other.get(i)
+    }
+    size = newSize
+}
+```
+
+
+
+
+3. DEFAULT PROPERTIES (S 59-61)
+   Just like methods, you can define properties in an interface. However,
+   interfaces CANNOT HOLD STATE (they don't have memories). They only compute
+   things based on other properties.
+
+
+   EXAMPLE: `area`
+   Every `PageElement` has a width and height. We can automatically provide an
+   `area`.
+
+```Kotlin
+interface PageElement {
+    val width: Int
+    val height: Int
+
+    val area: Int
+        get() = width * height
+}
+```
+
+   Now, `TextBox` and `Image` get `.area` automatically without writing any code
+   .
+
+
+
+4. CACHING EXPENSIVE PROPERTIES (S 62-64)
+
+   What if the calculation is really heavy? (e.g., `calculatePhysics()` or
+   `renderShadow()`). The default property in the interface runs the calculation
+   EVERY SINGLE TIME you access it.
+
+   To fix this, the implementing class can OVERRIDE the property to store
+   (cache) the result.
+
+```Kotlin
+class HeavyElement : PageElement {
+    // 1. Private variable to store the result (Memory)
+    private var cachedArea: Int? = null
+
+    override val width  = 100
+    override val height = 200
+
+    // 2. Override the property to use the cache
+    override val area: Int
+        get() {
+            if (cachedArea == null) {
+                // "super.area" calls the default calculation (width * height) from the interface
+                cachedArea = super.area
+            }
+            return cachedArea!!
+        }
+}
+```
+
+   Note: This technique relies on `width` and `height` not changing. If they
+   change, your cache becomes stale (wrong)!
+
+
+LECTURE 4 SUMMARY
+   1. INTERFACES define a contract (`val size`, `fun add`) without
+      implementation details.
+   2. POLYMORPHISM allows us to write one function (`maxHeights`) that works
+      for `TextBox`, `Image` and `Menu` simultaneously.
+   3. DEFAULT METHODS (`isEmpty`) let us add functionality to the interface
+      itself to reduce code duplication.
+   4. OVERRIDING DEFAULTS allow specific classes (like `ResizingArrayList`) to
+      provide faster implementations than the generic default.
+
+
+
+
+
+
+
+
+
+   1. OPERATOR OVERLOADING (Making your objects work with `+`, `*`, `[]`)
+   2. EXTENSION METHODS (Adding features to classes you didn't write)
+
+---
+LECTURE 5: PART 1, OPERATOR OVERLOADING (S 1-21)
+   Kotlin allows you to redefine what standard symbols (like `+`, `-`, `*`, `[]`)
+   do for your custom classes. This isn't magic; the compiler simply maps
+   symbols to specific function names.
+
+
+   1. THE RULE OF THE `operator` KEYWORD
+      To use a symbol, you must define a function with a specific name and mark
+      it with `operator`.
+
+`a + b`
+    `a.plus(b)`
+`a * b`
+    `a.times(b)`
+`a[i]`
+    `a.get(i)`
+`a[i] = b`
+    `a.set(i, b)`
+`a in b`
+    `b.contains(a)`
+
+   2. EXAMPLE: THE `Point` CLASS (Math)
+      Instead of writing `p1.add(p2)`, we want to write `p1 + p2`.
+
+```Kotlin
+data class Point(val x: Int, val y: Int) {
+
+    // 1. Overloading `+`
+    operator fun plus(other: Point): Point {
+        return Point(this.x + other.x, this.y + other.y)
+    }
+
+    // 2. Overloading `*` (Scalar multiplication)
+    operator fun times(scale: Int) = Point(this.x * scale, this.y * scale)
+}
+
+        ...
+```
+        Note: Order matters!! `10 * p1` won't work because `Int` doesn't have a
+        `times(Point)` function. We fix that in Part 2.
+
+
+
+
+   3. EXAMPLE: ARRAY-LIKE ACCESS `[]`
+      You can make your object behave like an array or map using `get` and `set`
+
+
+```Kotlin
+class MutablePoint(var x: Int, var y: Int) {
+
+    // Read: p[0] returns x
+    operator fun get(index: Int) {
+        return when(index) {
+            0 -> x
+            1 -> y
+            else -> throw IndexOutOfBoundException()
+        }
+    }
+
+
+    // Write: p[0] = 10 sets x
+    operator fun set(index: Int, value: Int) {
+        when(index) {
+            0 -> x = value
+            1 -> y = value
+            else -> throw IndexOutOfBoundsException()
+        }
+    }
+}
+```
+
+
+
+   4. INFIX FUNCTIONS
+      If you want readable code without using symbols, you çan use `infix`.
+      This lets you drop the dot and parentheses.
+
+```Kotlin
+// Define it
+infix fun Point.crossProduct(other: Point): Int { ... }
+
+// Use it
+val result = p1 crossProduct p2     // Same as p1.crossProduct(p2)
+```
+
+
+            READY FOR P2?
+               This covers EXTENSION METHODS, which is how we solve the problem
+               of making `10 * p1` work even though we don't own the `Int` class
+
+
+
+
+
+
+
+
+
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣿⣿⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⢶⣦⡀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡠⠤⠒⢀⣿⣿⣿⣧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⠃
+⠀⠀⠀⠀⠀⢀⣠⣴⠶⡛⢉⣀⣤⣶⣿⣿⣿⣿⣿⣿⣶⣤⣀⡀⠀⠀⠀⠀⠀⣴⣿⠟⠁⠀
+⠀⠀⣀⣤⡾⠟⠋⠀⡈⠉⠙⠛⠻⢿⣿⣿⣿⣿⣿⣿⡿⠟⠛⠋⠉⢀⣠⣴⠟⠋⠁⠀⠀⠀
+⢠⣾⡿⠋⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠙⣿⣿⣿⡿⠋⠀⢀⣠⠴⠚⠋⠉⠀⠀⠀⠀⠀⠀⠀
+⣿⣿⠁⠀⠀⠀⢀⣸⣧⡀⠀⠀⠀⠀⠀⠘⣿⣿⠧⠒⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠈⠛⠳⠦⠀⠈⠙⢿⣿⠛⠉⠀⠀⠀⠀⠀⢻⡟⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠈⡇⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠃⠀⠀⠀⠀⠀⠀⠀⠈⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+*/
+
+
+
+
+
+
+/*
+    Kotlin's EXTENSION METHODS allow you to add new functionality to classes you
+    don't own (like `String`, `Int`, or third-party classes) without inheriting
+    from them or writing clunky utility wrappers. For a C++ developer, think of
+    them as standalone helper functions (like `std::count`), but called using
+    member-function syntax (`std.count()`).
+
+    Here is the fast-paced breakdown of S22 through the end of the lecture.
+
+
+
+    1. BASIC EXTENSION METHODS (S22-25)
+       You typically declare these at the file-level scope.
+
+       SYNTAX: Prefix the function name with the class you want to extend (this
+       is called the RECEIVER TYPE).
+```Kotlin
+// Adds a custom count() to Kotlin's built-in String class
+fun String.count(c: Char): Int = this.count { it == c }
+
+// Usage:
+println("Hello".count('l'))
+```
+   - `this`: Inside the extension, `this` refers to the RECEIVING OBJECT (the
+     string `"Hello"`).
+   - Just like in regular class methods, you can omit `this` when there is no
+     ambiguity (e.g., `= count { it == c }`)
+
+
+
+            `count()` returns the number of elements in a collection.
+
+
+
+
 
 
 
