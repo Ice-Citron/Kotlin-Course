@@ -404,6 +404,52 @@ fun inc() {
 
 
 
+PART 2 (S 25-48): MUTUAL EXCLUSION, LOCKS and DEADLOCK AVOIDANCE
+
+   This section maps directly to C++ concepts like `std::mutex`,
+   `std::recursive_mutex`, and `std::lock_guard`. Because Kotlin runs on the JVM
+   , it handles these synchronisation primitives slightly differently, relying
+   on higher-order functions rather than RAII.
+
+
+1. MUTUAL EXCLUSION AND CRITICAL SECTIONS (S 25-33)
+   To solve the data race from P1 (the lost increment), we need MUTUAL EXCLUSION
+   . A block of code that accesses shared, mutable state is called a CRITICAL
+   SECTION. A robust solution guarantees three things:
+      1. MUTUAL EXCLUSION: At most one threads enters the critical section at a
+         time.
+      2. FREEDOM FROM DEADLOCK: If threads are trying to enter, at least one
+         will eventually succeed.
+      3. FREEDOM FROM STARVATION: Every thread trying to enter will eventually
+         succeed.
+
+
+   LOCKS IN KOTLIN:
+   Kotlin doesn't have a native lock primitive; it imports the highly optimised
+   `Lock` interface from Java's `java.util.concurrent.locks` package.
+
+```Kotlin
+import java.util.concurrent.locks.Lock
+import java.util.concurrent.locks.ReentrantLock
+
+class Counter {
+    // 1. Create the mutex
+    private val lock: Lock = ReentrantLock()
+    var value = 0
+        private set
+
+    // The unsafe, manual way
+    fun inc(): Int {
+        lock.lock()         // 2. Acquire
+        val result = value
+        value++             // Critical Section
+        lock.unlock()       // 3. Release
+    }
+}
+```
+
+
+
 
 
 
@@ -470,6 +516,14 @@ fun inc() {
               `abstract` when you have a high-level concept (like `Shape`) that
               shouldn't exist on its own but provides the essential structure
               for specific types (like `Circle` or `Square`).
+
+
+
+            - RAII = The principle that objects own resources is also known as
+              "resource acquisition is initialisation," or RAII. When a
+              resource-owning stack object goes out of scope, its destructor is
+              automatically invoked. In this way, Garbage Collection in C++
+              is closely related to object lifetime, and is deterministic.
 * */
 
 
