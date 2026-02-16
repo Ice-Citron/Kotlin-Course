@@ -369,6 +369,43 @@ fun main() {
 
 3. SHARED MEMORY AND THE JVM (S 17-19)
    The memory model works exactly as you'd expect from C++:
+   - THE STACK: Every thread gets its own private call stack. Local variables
+     declared inside a function are inherently thread-safe.
+   - THE HEAP: All threads share the same Heap. In Kotlin, ALL CLASS INSTANCES
+     (OBJECTS) live on the Heap. Therefore, if multiple threads have a reference
+     to the same object, its properties are subject to concurrent modification.
+
+
+4. RACE CONDITIONS vs. DATA RACES (S 20-24)
+   The lecture draws a strict academic distinction between these two terms:
+   - RACE CONDITION (LOGIC LEVEL): A flaw (or feature) in system behavior where
+     the output depends on the unpredictable sequence/timing of threads.
+      - Example: Two people trying to buy the last Taylor Swift concert ticket
+        online. It's nondeterministic who gets it, but the system functions
+        logically. Not all race conditions are bugs!
+   - DATA RACE (MEMORY LEVEL): The low-level disaster. Two threads access the
+     exact same memory location simultaneously, at least one is write, and there
+     is no synchronisation. ALWAYS A BUG.#
+
+
+   THE CLASSIC EXAMPLE:
+```Kotlin
+var value = 0
+
+// This is NOT atomic. Under the hood, it's a Read-Modify-Write.
+fun inc() {
+    value++
+}
+```
+
+   If two threads call `inc()` simultaneously on the same shared object, they
+   will both read `0`, both compute `1`, and both write `1` back to RAM. You
+   lose an increment because the operations interleave.
+
+
+
+
+
 
 
 
