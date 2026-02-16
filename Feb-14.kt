@@ -405,6 +405,104 @@ SUMMARY OF T2L6
 
 
 
+PART 1 (S2-34): INHERITANCE BASICS, `open`, and VISIBILITY MODIFIERS
+   For a C++ developer, Kotlin's inheritance model will feel conceptually
+   familiar, but with one massive philosophical difference: Kotlin is strictly
+   "closed" by default. You must explicitly grant permission for a class to be
+   inherited or a method to be overridden.
+
+1. THE `open` KEYWORD (Final-by-Default) (S2-15)
+   In C++, you can inherit from any class unless it is explicitly maked `final`.
+   In Kotlin, classes are locked down by default to prevent the "fragile base
+   class" problem.
+
+   To allow a class to be subclassed, you must mark it wih the `open` keyword.
+   Similarly, methods in Kotlin are non-virtual (`final`) by default. To allow
+   a subclass to override a method, you must mark the base method as `open`
+   (like C++ `virtual`).
+
+```Kotlin
+// `open` means "this class can be inherited from"
+open class Lamp(private var isOn: Boolean) {
+
+    // `open` means this method can be overridden (dynamic dispatch)
+    open fun pressSwitch() {
+        isOn = !isOn
+    }
+}
+```
+
+
+
+2. EXTENDING A CLASS AND OVERRIDING METHODS (S 16-18)
+   To inherit from a class, you use a colon `:` followed by the base class
+   constructor invocation (this acts exactly like a C++ member initializer
+   list calling the base constructor).
+
+   When overriding an `open` method, the subclass must explicitly use the
+   `override` keyword (similar to C++11's `override`, but strictly mandatory).
+   You use `super` just like you do in C++ or Java to invoke the base class
+   implementation.
+
+```Kotlin
+// DimmingLamp inherits from Lamp.
+// We pass `isOn` directly up tot he Lamp constructor.
+class DimmingLamp(isOn: Boolean) : Lamp(isOn) {
+    private var brightness: Int = if (isOn) 10 else 0
+
+    // Must use the `override` keyword!
+    override fun pressSwitch() {
+        super.pressSwitch()         // Calls Lamp's pressSwitch()
+        brightness = if (isOn) 10 else 0
+    }
+}
+```
+
+
+3. VISIBILITY AND `protected` (S 19-27) [IDIOMATIC KOTLIN]
+   Just like C++, a subclass cannot access `private` members of its base class.
+   If `DimmingLamp` needs to know if the lamp `isOn`, making it `public`
+   destroys encapsulation.
+
+   Kotlin provides the exact same `protected` keyword as C++: visible only to
+   the class and its subclasses.
+
+
+THE "KOTLIN WAY" FOR ENCAPSULATION:
+   If `Lamp` makes `isOn` pure `protected`, `DimmingLamp` can read it, but it
+   can also write to it (e.g., `isOn = true`), potentially bypassing internal
+   logic. If you want a subclass to only read a property, Kotlin allows you to
+   split the visibility of the getter and the setter!
+
+```Kotlin
+open class Lamp(isOn: Boolean) {
+    // Subclasses can READ `isOn`, but ONLY Lamp can WRITE to it.
+    protected var isOn: Boolean = isOn
+        private set
+}
+```
+
+   This is highly idiomatic and saves you from writing clunky
+   `protected boolean getIsOn()` boilerplate.
+
+
+
+4. INHERITANCE TERMINOLOGY (S 28-31)
+   Just a quick terminology alignment (Kotlin uses standard OOP terms
+   interchangeably):
+   - SUPERCLASS: Base class, Parent class
+   - SUBCLASS: Derived class, Child Class
+   - Inheritance is TRANSITIVE (if C extends B, and B extends A, C is an
+     indirect subclass of A).
+   - Subclasses inherit all `public` and `protected` members.
+
+
+5. INTRO TO GridWorld (S 32-34)
+   This section closes by visually introducing a 2D game called `GridWorld`. A
+   skeleton player navigates a grid with various terrains (Water, Rocks, Forest,
+   Swamp). This visually sets up the architecture problem we will solve in the
+   next section: How do we cleanly program what happens when the player walks
+   off the edge of the map?
 
 
 
@@ -417,6 +515,73 @@ SUMMARY OF T2L6
 
 
 
+
+
+PART 2 (S 35-66): THE EXTENSIBILITY PROBLEM AND ABSTRACT CLASSES.
+   (Note: Since this lecture is exactly 66 long, this second part will take us
+   all the way to the end of this document!)
+
+   This section tackles a classic architectural problem: How do you write logic
+   that handles multiple different behaviors without writing massive,
+   unmaintainable `switch` statements.
+
+   For a C++ developer, you will immediately recognise the progression from an#
+   `enum`/`switch` to a virtual method, and finally to a pure virtual function
+   (`= 0`).
+
+
+
+1. THE "ENUM ANTI-PATTERN" (S 35-46)
+   Imagine `GridWorld` can have different behaviors when the player walks off
+   the edge:
+      - BOUNDED: Hitting the edge does nothing (blocks movement).
+      - DEADLY: Hitting the edge throws an exception (kills the player).
+      - RANDOM: Hitting the edge teleports the player randomly.
+
+   A novice approach is to pass an `enum` into the `GridWorld` class and use a
+   `when` statement (Kotlin's `switch`):
+```Kotlin
+enum class WorldKind { BOUNDED, DEADLY, RANDOM }
+
+class GridWorld(private val worldKind: WorldKind, ...) {
+    private fun updatePosition(newPosition: Pair<Int, Int>) {
+        // ... if off grid:
+        when (worldKind) {
+            WorldKind.BOUNDED -> return     // Do nothing
+            WorldKind.DEADLY -> throw DeadPlayerException("Fell off world!")
+            WorldKind.RANDOM -> position = randomPosition()
+        }
+    }
+}
+```
+
+   THE FATAL FLAW: What if you want to add a `Torus` world (wrapping around the
+   edges like Pac-Man)? You are forced to open up the core `GridWorld` class,
+   add to the enum, and add a branch to the `when` statement. This violates the
+   OPEN-CLOSED PRINCIPLE (classes should be open for extension, but closed
+   for modification).
+
+
+2. THE FIRST INHERITANCE ATTEMPT (S 47-54)
+   To make it extensible, we drop the enum, mark `GridWorld` as `open`, and
+   delegate the specific logic to subclasses via an `open` method. Because the
+   base class doesn't know what to do, it provides a "dummy" implementation.
+
+```Kotlin
+open class GridWorld(...) {
+    // Virtual function with a "dummy" default implementation
+    protected open fun handleOverrun(newPosition: Pair<Int, Int>)
+        : Pair<Int, Int> = throw NotImplementedError("
+                                This method should be provided by subclasses")
+}
+```
+   Subclasses like `BoundedGridWorld` then inherit this and `override` the
+   method to provide their specific behavior.
+
+
+
+
+KOTLIN TIP: Narrowing to `Nothing`
 
 
 
