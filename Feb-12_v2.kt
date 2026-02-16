@@ -181,5 +181,5 @@ Add(Middle)// Slow (O(N)) // You have to traverse to find the spot.
 * */
 
 fun main() {
-
+    println("Fuck kotlin honestly")
 }
