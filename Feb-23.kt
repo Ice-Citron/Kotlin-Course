@@ -2,6 +2,13 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
 
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock       // Kotlin's handy extension for try/finally lock management
+
+// import java.util.concurrent.locks.ReentrantLock
+// import java.util.concurrent.TimeUnit
+// import kotlin.concurrent.withLock
+
 /*
     in kotlin, what's the difference between an open class and an abstract class
 
@@ -387,11 +394,52 @@ KEY ASPECTS OF NON-OWNERSHIP IN KOTLIN:
     behaves exactly like a `Mutex`, but it physically blocks the operating
     system thread that tries to acquire it until the lock becomes available.
 
-
+    THE COMPLEX PART: The logic to avoid deadlock (circular dependencies)
+    remains exactly the same. We must arbitrarily order our locks s.t. two
+    threads trying to transfer money back and forth between the same two
+    accounts don't freeze the system.
 * */
+// import java.util.concurrent.locks.ReentrantLock
+// import kotlin.concurrent.withLock        // Kotlin's handy extension for try/finally lock management
+
+class BankAccount_2(val id: Int, var balance: Double) {
+    // Standard JVM lock
+    val lock = ReentrantLock()
+}
+
+fun transfer(from: BankAccount_2, to: BankAccount_2, amount: Double) {
+    // Sort locks to avoid deadlock (always lock smaller ID first)
+    val lock1 = if (from.id < to.id) from.lock else to.lock
+    val lock2 = if (from.id < to.id) to.lock else from.lock
+
+    // withLock automatically handles locking and unlocking (even on errors)
+    lock1.withLock {
+        Thread.sleep(10)        // Simulate processing time (blocks the thread)
+
+        lock2.withLock {
+            if (from.balance >= amount) {
+                from.balance -= amount
+                to.balance   += amount
+                println("Transferred $$amount from ${from.id} to ${to.id}.")
+            } else {
+                println("Insufficient funds in ${from.id}")
+            }
+        }
+    }
+}
 
 
+/*
+---
+SUMMARY OF JVM THREADING PRIMITIVES USED
 
+    Primitive // Complexity Level // Best Use Case
+    `ReentrantReadWriteLock` // Medium // Caches/Databases where Read >> Write.
+    `ReentrantLock` // High (if nested) // Standard mutual exclusion. Safely
+                                           modifying shared data objects.
+    `java.util.concurrent.Semaphore` // Medium // Limiting access capacity
+                                        , protecting external APIs or limited hardware.
+* */
 
 
 
@@ -465,7 +513,10 @@ BEST PRACTICES
     - KEEP LOCKS SHORT: Minimise the time spent holding a lock to avoid
       bottle-necking the application.
     - AVOID NESTED LOCKS: Using one lock inside another can lead to deadlocks.
-    -
+    - USE ATOMICS FOR SIMPLE TYPES: For simple shared variables (like a counter)
+      , `AtomicInteger` is faster than a `Mutex`.
+    - Use `withLock` for Safety: Always prefer `withLock` to ensure the lock is
+      always released.
 * */
 
 
@@ -473,3 +524,242 @@ BEST PRACTICES
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+/* ---------    ---------           --  -   -   --  -   -           -   -----*/
+/* ---------    ---------           --  -   -   --  -   -           -   -----*/
+/*
+    ... the right way to learn concurrency... You need to see the patterns over
+    and over until the mechanics click.
+
+    Since you are focusing on raw thread mechanics (no coroutines), we will be
+    using the `java.util.concurrent` package that Kotlin runs on under the hood.
+
+    Here is your rapid-fire guide to the core locking mechanisms, why they exist
+    , and when to use them.
+
+
+---
+1. THE OG: `synchronized` (INTRINSIC LOCKS / MONITORS)
+    Every object in the JVM has a built-in "hidden" lock called a monitor. The
+    `synchronized` keyword simply grabs this lock.
+*/
+class ThreadSafeCounter {
+    private var count = 0
+    private val lockObject = Any()      // A dummy object ot act as our lock
+
+    fun increment() {
+        // Only one thread can enter this block at a time
+        synchronized(lockObject) {
+            count++
+            println("Count is now $count by ${Thread.currentThread().name}")
+        }
+    }
+}
+
+
+/*
+    - WHY USE IT HERE? It is dead simple. You don't have to worry about `try`
+      / `finally` blocks because the JVM automatically releases the lock when
+      the block finishes (even if an exception is thrown).
+    - WHY NOT USE IT HERE? It is rigid. A thread waiting for a `synchronized`
+      lock will wait forever. It cannot be interrupted, and you cannot set a
+      timeout.
+    - WHEN TOP USE: For simple, short, and fast critical sections where you just
+      need basic thread safety without complex routing.
+    - WHEN NOT TO USE: When you need a timeout, when you need to lock in one
+      method and unlock in another, or when you have complex read/write dynamics
+      .
+
+
+---
+2. THE WORKHORSE: `ReentrantLock` (The JVM Mutex)
+    In the JVM world, when people say "Mutex," they usually mean `ReentrantLock`
+    . It provides mutual exclusion (one thread at a time) but adds advanced
+    features that `synchronized` lacks. "Reentrant" means if a thread already
+    holds the lock, it can enter the lock again without deadlocking itself.
+
+
+
+
+* */
+
+
+
+/*
+
+
+
+* */
+
+
+
+/* ---------    ---------           --  -   -   --  -   -           -   -----*/
+/* ---------    ---------           --  -   -   --  -   -           -   -----*/
+/*
+    A `ReentrantLock` in Kotlin (specifically from `java.util.concurrent.locks`)
+    is an explicit, advanced mutual exclusion tool that ensures only one thread
+    accesses a critical section of code at a time.
+
+    Unlike the simple `synchronized` keyword, a REENTRANT lock allows the same
+    thread to acquire the lock multiple times without deadlocking itself.
+
+    Note: In modern Kotlin, `Mutex` is preferred over `ReentrantLock` for
+    coroutines, but understanding `ReentrantLock` is crucial for Java
+    interoperability and high-performance blocking scenarios.
+
+
+---
+WHAT IS A ReentrantLock in Kotlin?
+    1. REENTRANCY: If a thread holds the lock and tries to lock it again (e.g.,
+       in a recursive function or nested method calls), it succeeds immediately,
+       increasing a "hold count".
+    2. EXPLICIT CONTROL: You must manually call `lock.lock()` and
+       `lock.unlock()`.
+    3. FINALLY BLOCK NECESSITY: To prevent deadlocks, you MUST use a
+       `try-finally` block to guarantee the lock is released.
+    4. ADVANCED FEATURES: It supports fairness (granting access to the
+       longest-waiting thread), `tryLock()` (attempting to acquire without
+       blocking indefinitely), and `Condition` objects for thread communication.
+
+
+EXAMPLE: BASIC USAGE
+```Kotlin
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
+
+val lock = ReentrantLock()
+val sharedResource = 0
+
+fun updateResource() {
+    lock.withLock() {
+        sharedResource++
+    }
+}
+```
+
+WHY USE `ReentrantLock` in Kotlin?
+    While Kotlin Coroutines encourage using `Mutex` (which suspends instead of
+    blocking), `ReentrantLock` is used for specific reasons:
+       1. PREVENTING SELF-DEADLOCK IN RECURSION: If a thread calls a
+          synchronised method that calls another synchronised method on the same
+          object, `ReentrantLock` allows this, whereas simple locks might block
+          forever.
+       2. FLEXIBILITY (`tryLock`): You can check if a lock is available without
+          waiting indefinitely. If it's busy, you can skip the update or do
+          other work.
+       3. FAIRNESS POLICY: By creating a "fair" lock (`ReentrantLock(true)`),
+          you can prevent thread starvation, ensuring the longest-waiting thread
+          gets access first.
+       4. HIGH-PERFORMANCE CPU-BOUND TASKS: For extremely short, high-contention,
+          CPU-bound tasks, `ReentrantLock` can sometimes be faster than `Mutex`
+          because oit avoids the overhead of coroutine context switching.
+* */
+
+
+
+
+
+
+/* ---------    ---------           --  -   -   --  -   -           -   -----*/
+/* ---------    ---------           --  -   -   --  -   -           -   -----*/
+/*
+2. THE WORKHORSE: `ReentrantLock` (The JVM Mutex)
+   In the JVM world, when people say "Mutex", they usually mean `ReentrantLock`.
+   It provides mutual exclusion (one thread at a time) but adds advanced
+   features that `synchronized` lacks. "Reentrant" means if a thread already
+   holds the lock, it can enter the lock again without deadlocking itself.
+*/
+// import java.util.concurrent.locks.ReentrantLock
+// import java.util.concurrent.TimeUnit
+// import kotlin.concurrent.withLock
+
+class TicketBookingSystem {
+    private val lock = ReentrantLock()
+    private var ticketsAvailable = 1
+
+    fun tryToBookTicket(user: String) {
+        // The superpower of ReentrantLock: We don't wait forever!
+        // We wait for 2 seconds. If we don't get the lock, we walk away.
+        val acquired = lock.tryLock(2, TimeUnit.SECONDS)
+
+        if (acquired) {
+            try {
+                if (ticketsAvailable > 0) {
+                    Thread.sleep(500)   // Simulate processing
+                    ticketsAvailable--
+                    println("$user successfully booked the ticket!")
+                } else {
+                    println("$user: Sorry, sold out.")
+                }
+            } finally {
+                lock.unlock()           // CRITICAL: You must manually unlock
+            }
+        }
+    }
+}
+
+
+/*
+    - WHY USE IT HERE? The `tryLock()` method prevents threads from freezing
+      indefinitely if the system gets jammed.
+    - WHY NOT USE IT? You must remember the `try / finally` block (or use
+      Kotlin's `lock.withLock {}` helper). If you forget to unlock, your entire
+      program deadlocks.
+    - WHEN TO USE: When you need timeouts, fairness (giving the lock to the
+      thread that has been waiting the longest), or the ability to interrupt a
+      waiting thread.
+    - WHEN NOT TO USE: If a simple `synchronized` block does the exact same job,
+      use `synchronized` to save boilerplate.
+* */
+
+
+
+
+
+
+/* ---------    ---------           --  -   -   --  -   -           -   -----*/
+/* ---------    ---------           --  -   -   --  -   -           -   -----*/
+/*
+---
+3. THE OPTIMIZER: `ReentrantReadWriteLock`
+    A standard `ReentrantLock` forces everyone to wait in a single file line.
+    But what if 99% of your threads just want to read a value, and only 1% want
+    to write? Forcing readers to wait for other readers is highly inefficient.
+* */
+// import java.util.concurrent.locks.ReentrantReadWriteLock
+// import kotlin.concurrent.read
+// import kotlin.concurrent.write
+
+
+
+
+
+
+
+
+
+
+
+
+/* ---------    ---------           --  -   -   --  -   -           -   -----*/
+/* ---------    ---------           --  -   -   --  -   -           -   -----*/
+
+/*
+            Gemini said: https://gemini.google.com/app/61f5e835c1f55bc4
+                I completely understand why it feels confusing! You have actually nailed the three foundational classes related to inheritance, but that isn't quite the whole picture.
+
+                Kotlin introduces several extra "specialty" classes. Instead of making you write hundreds of lines of boilerplate code (like you would in traditional Java), Kotlin gives you specific keywords to handle common scenarios instantly.
+
+                Here is your complete cheat sheet for every type of class in Kotlin:
+* */
