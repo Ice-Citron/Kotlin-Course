@@ -1,0 +1,2 @@
+Why use it here? A leaderboard is read thousands of times a second but updated rarely. This lock prevents a bottleneck by letting all readers read at the exact same time.
+https://gemini.google.com/app/61f5e835c1f55bc4

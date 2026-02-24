@@ -9,6 +9,10 @@ import kotlin.concurrent.withLock       // Kotlin's handy extension for try/fina
 // import java.util.concurrent.TimeUnit
 // import kotlin.concurrent.withLock
 
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
+
 /*
     in kotlin, what's the difference between an open class and an abstract class
 
@@ -740,6 +744,37 @@ class TicketBookingSystem {
 // import java.util.concurrent.locks.ReentrantReadWriteLock
 // import kotlin.concurrent.read
 // import kotlin.concurrent.write
+
+class HighScoreLeaderboard {
+    private val rwLock = ReentrantReadWriteLock()
+    private var topScore = 0
+
+    fun getTopScore(): Int {
+        // Unlimited threads can enter here simultaneously
+        // UNLESS a write lock is currently active.
+        rwLock.read {
+            return topScore
+        }
+    }
+
+    fun updateScore(newScore: Int) {
+        // Only ONE thread can enter here.
+        // It must wait for all current readers to finish before it starts
+        rwLock.write {
+            if (newScore > topScore) {
+                topScore = newScore
+                println("New top score: $topScore")
+            }
+        }
+    }
+
+}
+
+
+
+
+
+
 
 
 
