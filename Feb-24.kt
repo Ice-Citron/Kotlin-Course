@@ -7,6 +7,7 @@ import kotlin.concurrent.read
 import kotlin.concurrent.withLock
 import kotlin.concurrent.write
 import kotlin.math.sqrt
+import kotlin.concurrent.thread
 
 /*
 1. THE OG: `synchronized` (INTRINSIC LOCKS / MONITORS)
@@ -244,10 +245,12 @@ fun main() {
 
 /* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
 /* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+// SmartLock requires everything Lock requires, PLUS a battery.
 interface SmartLock : Lock {
     var batteryLevel: Double
 }
 
+// Sub-type implementation
 class WifiLock(
     override var batteryLevel: Double = 100.0,
     override var isLocked: Boolean = true
@@ -264,21 +267,80 @@ class WifiLock(
 }
 
 fun securityScanner(device: Lock) {
-    with (device) {
+    // `with` groups multiple calls. We can't access batteryLevel here
+    // because the Apparent Type is just `Lock`
+    with (device) {         // `device as WifiLock`
         unlock()
         lock()
+    } // `with` returns block result
+}
+
+/*
+    val WLock: WifiLock = WifiLock()
+    securityScanner(WLock)  // OK: WifiLock offers everything Lock requires
+}
+ */
+
+
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+// QUESTION 3: THE NULLABILITY HIERARCHY AND `let`
+
+/*
+fun main() {
+    var backDoorLock: Lock? = null
+    backDoorLock = PadLock()
+    backDoorLock?.let {
+        it.unlock()
     }
 }
+ */
 
 
-fun main() {
-    val WLock: WifiLock = WifiLock()
-    securityScanner(WLock)
+
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+fun triggerAlarm(): Nothing {
+    throw Exception("Intruder")
 }
 
+/*
+fun main() {
+    val pin: Int = 3310
+    val status: String = run {          // This compiles because `Nothing` is a subtype of String
+        if (pin == 1234) "Access Granted"
+        else triggerAlarm()
+    }
+}
+ */
+
+
+
+
 
 /* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
 /* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+// Rule: If a function returns T, it is OK to return U, as long as U <: T.
+// Lock is the supertype, WifiLock is the subtype.
+fun lockFactory(): Lock {
+
+    // also executes the print statement, and then seamlessly
+    // returns the WifiLock object down the chain to the `return` statement.
+    return WifiLock().also { println("WifiLock successfully manufactured.") }
+}
+
+/*
+fun main() {
+    val newLock = lockFactory()
+}
+* */
+
+
+
+
 
 
 
@@ -288,7 +350,77 @@ fun main() {
 
 /* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
 /* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/*
+fun main() {
+    val myThread = Thread {
+        println("Chatty thread running!")
+        Thread.sleep(500)
+    }
+    myThread.apply {
+        start()         // Begins execution
+        join()          // Main thread pauses here until this thread finishes
+    }
+    println("Main thread done!")
 
+    val myTask = thread(start = false) {
+        // Heavy math or I/O here...
+        println("Working...")
+    }
+
+    myTask.apply{
+        start()     // Begin execution
+        // ... do other work here ...
+        join()      // Wait for myTask to finish before moving
+        println("Task complete!")
+    }
+
+    myTask.start()
+    // ... HEAVY SERIES OF OTHER TASKS RUNNING IN PARALLEL!
+    myTask.join()
+    println("V2 tasks completed!!!")
+}
+ */
+
+
+/*
+    In Kotlin, a THREAD is a standard way to achieve parallelism by running a
+    block of code concurrently with the main program. Since Kotlin typically
+    runs on the JVM, its `Thread` is a wrapper around the native operating
+    system thread. You create one by either instantiating the `Thread` class
+    or using the `thread { ... }` convenience function. When a thread is
+    created, it sits in a "New" state and doesn't actually execute until you
+    trigger it. This allows you to offload heavy computations--like processing
+    drone telemetry or running a computer vision model--away from the main
+    thread, keeping your application responsive.
+
+    The function `start()` and `join()` manage the thread's lifecycle. Calling
+    `start()` tells the JVM to allocate resources and actually begin executing
+    the code inside the thread's block; without it, the thread is just an idle
+    object. `join()`, on the other hand, is a blocking call used by the "parent"
+    thread (usually the main thread). When you call `threadA.join()`, the parent
+    thread will pause and wait until `threadA` has completely finished its
+    execution before moving to the next line of code.
+
+
+WHEN AND HOW THEY ARE USED
+    You normally use this pattern when you have a specific task that must run in
+    the background but whose result is required before the program can proceed.
+    For example:
+    - `start()`: Used immediately after setup to begin a background task, like
+      a socker listener for a robotic arm.
+    - `join()`: Used when you need to "synchronize" back up. If you start a
+      thread to calculate a complex path for a drone, you would call `join()`
+      right before the command to "move," ensuring the path coordinates are
+      actually ready.
+* */
+
+
+
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
 
 
 /* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
@@ -337,12 +469,44 @@ fun main() {
 /* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
 /* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
 
+class SafeTicketCounter(
+    var totalTickets: Int = 0,
+    private val lock: ReentrantLock = ReentrantLock()
+) {
+    fun sellTicket(): Int {
+        lock.withLock {
+            return (totalTickets++).also {println("Ticket sold! Total: $it.")}
+        }
+    }
+}
 
 
 
 
 
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+class ThreadSafeList(
+    private val lock: ReentrantLock = ReentrantLock(),
+    val items: MutableList<String> = mutableListOf<String>()
+) {
+    fun addOne(item: String) {
+        lock.withLock { items.add(item) }
+    }
+    fun addTwo(item: String) {
+        lock.withLock {
+            with (this) { addOne(item); addOne(item) }
+        }
+    }
+}
 
+/*
+fun main() {
+    val safeList = ThreadSafeList()
+
+    safeList.addTwo("Hello World")
+    println(safeList.items)
+}
 
 
 
