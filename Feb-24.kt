@@ -507,8 +507,118 @@ fun main() {
     safeList.addTwo("Hello World")
     println(safeList.items)
 }
+ */
 
 
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+
+var latestTicket: String? = "VIP-Ticket"
+val lock: ReentrantLock = ReentrantLock()
+
+fun processTicket() {
+    lock.withLock {
+        latestTicket?.let { println(it); throw Exception() }
+    }
+}
+
+/*
+fun main() {
+    try {
+        processTicket()
+    } catch (e: Exception) {
+        println("Caught an error, but continuing...")
+    }
+    println("Ticket successfully released regardless!")
+}
+ */
+
+
+
+
+
+
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+// QUESTION 5: Breaking the "Circular Wait" Deadlock with `run`
+class Account(
+    val id: Int,
+    var balance: Double = 1000.0,
+    val lock: ReentrantLock = ReentrantLock()
+)
+
+fun transferA(fromAcc: Account, toAcc: Account, amount: Double) {
+    // We ise `run` to calculate and return a Pair of accounts strictly ordered
+    // by ID.
+    // This entirely eliminates the Coffman "Circular Wait" deadlock condition!
+    val (firstAcc, secondAcc) = run {
+        if (fromAcc.id < toAcc.id) Pair(fromAcc, toAcc) else Pair(toAcc, fromAcc)
+    }
+
+    // Always acquire locks in the globally consistent order we just calculated
+    firstAcc.lock.withLock {
+        secondAcc.lock.withLock{
+
+            // Critical section is now 100% safe from data races and deadlocks!
+            if (fromAcc.balance >= amount) {
+                fromAcc.balance -= amount
+                toAcc.balance += amount
+                println("Successfully transferred $amount")
+            }
+        }
+    }
+}
+
+
+
+/*
+    ... Imagine you have two users, ALICE (id=1) and BOB (id=2), trying to send
+    money to each other at the exact same millisecond on different threads.
+
+    - THREAD A (Alice to Bob): Locks Alice... then waits to lock Bob.
+    - THREAD B (Bob to Alice): Locks Bob... then waits to lock Alice.
+
+    Neither thread can move forward because the other is holding the "key" they
+    need. They will sit there forever, staring at each other. This is a classic
+    dead-lock.
+
+
+WHY THE ID ORDER FIXES IT
+    By forcing the code to ALWAYS LOCK THE SMALLER ID FIRST, you break the
+    circle and turn it into a queue. Let's look at ... with
+    `if (id1 < id2)` logic applied:
+
+    1. THREAD A (Alice to Bob): Sees IDs 1 and 2. It locks 1 first, then tries
+       to lock 2.
+    2. THREAD B (Bob to Alice): Sees IDs 2 and 1. Because of your code, it also
+       tries to lock 1 first.
+
+    Now, instead of a standoff, Thread B sees that Alice is already locked by
+    Thread A. Thread B simply waits its turn. Once Thread A finishes the whole
+    transfer and releases both locks, Thread B can grab Alice, then Bob, and
+    finish its work.
+* */
+
+
+
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+
+
+
+
+
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
 
 
 
