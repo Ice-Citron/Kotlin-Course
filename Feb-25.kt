@@ -1,3 +1,7 @@
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
+
 /*
     ... State rollback (fixing your variable inside a `catch` block after a
     failure) is a famously tricky architectural concept. The fact that you
@@ -381,7 +385,18 @@ fun main2() {
     compiler reads the types vs. how the JVM executes them.
 * */
 
-
+/*
+    In Kotlin, the primary difference (between `open class` and
+    `abstract class`) is INSTANTIABILITY and REQUIREMENT: an `abstract` class is
+    a "blueprinted" shell that cannot be instantiated on its own and forces
+    subclasses to implement any abstract members it contains, whereas an `open`
+    class is a fully functional, "finished" class that simply grants permission
+    for other classes to inherit from it and override its logic. Essentially,
+    use `abstract` when the parent class is too incomplete to exist as an object
+    (lke a generic `Drone`), and use `open` when the parent is already a working
+    object (like a `StandardInterceptor`) that you just want to allow
+    specialised versions of.
+* */
 
 
 
@@ -392,6 +407,26 @@ fun main2() {
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
 // QUESTION 1: The Apparent Type Restriction (`apply` + `Thread`)
 
+open class Job {
+    open fun execute() = println("Generic Job")
+}
+
+class BackgroundJob : Job() {
+    override fun execute() {}
+    fun cancel() = println("Cancelled")
+}
+
+fun main3() {
+
+    val myJob: Job = BackgroundJob()    // APPARENT: `Job`, ACTUAL: `BackgroundJob`
+    Thread() {
+        if (myJob is BackgroundJob) myJob.cancel()
+    }.apply {
+        name = "Worker"
+        start()
+        join()
+    }
+}
 
 
 
@@ -413,8 +448,21 @@ fun main2() {
 
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+// QUESTION 2: Late Binding in a Critical Section (`also` + `withLock`)
 
-
+class JobQueue(
+    private val lock: ReentrantLock = ReentrantLock(),
+    private val queue: MutableList<Job> = ArrayList()
+) {
+    fun processAll() {
+        lock.withLock {
+            // `also` gives us the object to print BEFORE returning it to call
+            // `.execute()`     // DYNAMIC DISPATCH: Prints "Background Job"
+            // because it looks at the Actual Type!
+            queue.map { it.also { println("Processing job...") }.execute() }
+        }
+    }
+}
 
 
 
@@ -433,11 +481,224 @@ fun main2() {
 
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+// QUESTION 3: THE EXTENSION FUNCTION TRAP (`with`)
+
+open class Alert()
+
+class CriticalAlert() : Alert()
+
+fun Alert.sound() = println("Beep")
+fun CriticalAlert.sound() = println("NEE NAW NEE NAW!")
+
+fun trigger(alert: Alert) {
+    with (alert) { sound()}
+}
+
+fun main4() {
+    trigger(CriticalAlert())
+}
 
 
 
 
 
+
+
+
+/*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+/*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+// QUESTION 4: SWAPPABLE IMPLEMENTATIONS (`run` + INTERFACE)
+
+class User25(
+    val id: Int,
+    val name: String
+)
+
+class userRegistry(
+    var users: MutableMap<Int, User25>,
+    private val lock: ReentrantLock = ReentrantLock()
+) {
+    fun register(id: Int, name: String): Int {
+        return lock.withLock {
+            val newSize = run {
+                users[id] = User25(id, name)
+                users.size
+            }
+            println("Registered. Total users: $newSize")
+            newSize
+        }
+    }
+}
+
+fun main() {
+    val map: ConcurrentHashMap<Int, User25> = ConcurrentHashMap()
+    val registry: userRegistry = userRegistry(map)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+/*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+
+open class Lamp2
+
+
+class DimmingLamp2 : Lamp2() {
+    fun down() = println("Dimming")
+}
+
+class SmartHome(
+    val currentLamp: Lamp2 = DimmingLamp2(),
+    private val lock: ReentrantLock = ReentrantLock()
+) {
+    fun dimIfPossible() {
+        lock.withLock {
+            currentLamp.let { if (it is DimmingLamp2) it.down() }
+
+            // Pro-tip alternative using the safe-cast operator:#
+            // `(currentLamp as? DimmingLamp)?.let { it.down() }`
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+/*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+/*
+    ... Mastering the "Check-Then-Act" race condition and the Coffman Deadlock
+    avoidance puts you way ahead of the curve. ... bridged the gap betweens
+    Object-Oriented theory and real-world multithreaded architecture!
+
+    Let's bring it all home. Here is the final breakdown... This section is all
+    about HANDLING EDGE CASES SAFELY, PROTECTING YOUR INTERNAL DATA, AND KNOWING
+    WHEN NOT TO USE INHERITANCE.
+
+
+---
+1. DOWN-CASTING (`as`) AND ITS DANGERS
+    We learned earlier that Smart Casts (`is`) temporarily upgrade an object's
+    Apparent Type safely. However, if the compiler refuses to Smart Cast (
+    like with a mutable `var` that might be changed by another thread), you can
+    forcefully tell the compiler to upgrade the type using a DOWN-CAST (`as`).
+
+    EXPLAIN BY EXAMPLE:
+* */
+fun main610() {
+    val myLamp: Lamp2 = DimmingLamp2()
+
+    // myLamp.down()        // ERROR: Apparent type is Lamp2
+
+    // DOWNCAST: We forcefully tell the compiler, "Trust me, it's a DimmingLamp2"
+    val specificLamp = myLamp as DimmingLamp2
+    specificLamp.down()     // Works!
+
+    // THE DANGER:
+    val standadLamp: Lamp2 = Lamp2()
+    // val brokenLamp = standardLamp as DimmingLamp2        // CRASH! ClassCastException
+}
+/*
+    - WHEN DO I USE THEM: When you are mathematically 100% certain that the
+      Actual Type in memory is the subclass, but the compiler's strict rules
+      prevent a Smart Cast (`is`).
+    - WHY DO I USE THEM: It instantly gives you access to the subclass's
+      specific methods (like `.down()`).
+    - WHEN DO I NOT USE THEM AND WHY: Never use them as a "guess." If you
+      downcast an object and you are wrong about its Actual Type, your
+      application immediately crashes with a `ClassCastException`. Kotlin allows
+      a safer alternative: `as?` (Safe Cast), which returns `null` instead of
+      crashing if the cast fails.
+    - WHY THEM OVER OTHER USE CASES: Sometimes framework libraries return `Any`
+      (like getting data from an old database). You have to downcast it to a
+      `String` or a custom class to actually use it.
+* */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+/*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+/*
+2. ENCAPSULATING MUTABLE DATA (The "Friends" Challenge)
+    When an object holds a mutable collection (like a list of friends), you want
+    clients to be able to see the friends, but not arbitrarily add to them
+    without going through your offiial `considerFriendRequest()` method. The
+    slides present 3 OPTIONS to solve this.
+
+    EXPLAIN BY EXAMPLE:
+* */
+class User664(
+    val name: String,
+    private val _friends: MutableSet<User664> = mutableSetOf()
+    // Private internal state (Vulnerable if exposed directly)
+) {
+    // OPTION 1: The "View" (Fast, but slightly vulnerable)
+    // Exposes the exact same list, but masks it behind the read-only `Set` interface
+    val friendsOpt1: Set<User664>
+        get() = _friends
+
+    // OPTION 2: The "Copy" (100% safe, but uses extra memory)
+    // Generates a brand new list every time it is called
+    val friendsOpt2: Set<User664>
+        get() = _friends.toSet()            // <-- looks like we should just use this one!
+
+    // OPTION 3: The "Wrapper" (Safe and updates instantly, but crashes on
+    // mutation attempts). Uses Java's unmodifiable wrapper
+    val friendsOpt3: Set<User664>
+        get() = java.util.Collections.unmodifiableSet(_friends)
+}
+/*
+    - WHEN DO I USE THEM: Every time your class manages an internal list, map,
+      or set that outsiders need to read.
+    - WHY DO I USE THEM: It protects your object's internal state. If you expose
+      a raw `MutableSet`, anyone can add fake data to your class and bypass your
+      logic.
+    - WHEN DO I NOT USE THEM AND WHY:
+        - Do not rely on OPTION 1 (THE VIEW) if you don't trust the code calling
+          it. A malicious developer could forcefully downcast it:
+          `(user.friendsOpt1 as mutableSet<User664>).add(hacker)`.
+        - Do not use OPTION 2 (THE COPY) if the list is massive (e.g., 100,000
+          items) and called frequently, as it duplicates the entire list in
+          memory every time it is accessed.
+    - WHY THEM OVER OTHER USE CASE: OPTION 3 (The Wrapper) is often the industry
+      gold standard for large datasets. It doesn't duplicate memory, but if a
+      hacker tries to downcast and modify it, the wrapper actively fights back
+      and intentionally throws an `UnsupportedOperationException`.
+* */
 
 
 
