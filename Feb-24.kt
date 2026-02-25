@@ -609,6 +609,196 @@ WHY THE ID ORDER FIXES IT
 
 /* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
 /* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/*
+    In the real world, backend bugs don't usually come from simply forgetting to
+    type `.unlock()`. They come from subtle architectural flaws:
+    "Check-Then-Act" data races, circular wait deadlocks across multiple
+    resources, and mishandling internal state when exceptions occur.
+
+    Here are 4 SIGNIFICANTLY HARDER SCENARIOS. These mimic actual software
+    engineering challenges and map directly to the advanced concepts in ...
+
+    ... Focus purely on the logic, lock ordering, and architecture. Combine
+    your locks with Kotlin's scope functions (`let`, `run`, `with`, `also`
+    , `apply`).
+* */
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+// QUESTION 1: The "Check-Then-Act" Cache
+
+class UserCache(
+    private val map: MutableMap<String, String> = mutableMapOf(),
+    val lock: ReentrantLock = ReentrantLock()
+) {
+    fun getOrFetch(userId: String, fetchLogic: () -> String): String {
+        return lock.withLock {
+            map[userId].let { it ?: map.run { map[userId] = fetchLogic(); map[userId] }!! }
+        }
+    }
+
+}
+
+
+class UserCacheAns(
+    private val lock: ReentrantLock = ReentrantLock(),
+    private val map: MutableMap<String, String> = mutableMapOf()
+) {
+    fun getOrFetch(userId: String, fetchLogic: () -> String) {
+        return lock.withLock {
+            map[userId]?.let {
+                println("Cache hit for $userId!")
+                it
+            } ?: run {
+                println("Cache miss! Computing for $userId...")
+                map[userId] = fetchLogic()
+                map[userId]
+            }
+        }
+    }
+}
+
+
+
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+// QUESTION 2: The Multi-Resource Deadlock
+class Player(
+    val username: String,
+    val lock: ReentrantLock = ReentrantLock(),
+    val inventory: MutableList<String> = mutableListOf()
+)
+
+fun safeTrade(p1: Player, p2: Player, item: String) {
+    val (player1, player2) = run {
+        if (p1.username < p2.username) Pair(p1, p2) else Pair(p2, p1)
+    }
+
+    player1.lock.withLock {
+        player2.lock.withLock {
+            if (p1.inventory.remove(item)) {
+                p2.inventory.add(item)
+                println("$item transferred from $p1 to $p2 successfully.")
+            } else {
+                println("${p1.username} doesn't have $item.")
+            }
+        }
+    }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+// QUESTION 3: Recursive Reentrancy
+
+class Directory(
+    val name: String,
+    val size: Int,
+    private val lock: ReentrantLock = ReentrantLock(),
+    val subDirs: MutableList<Directory> = mutableListOf()
+) {
+    fun calculateTotalSize(): Int {
+        lock.withLock { return size + subDirs.map{ it.calculateTotalSize() }.sum() }
+    }
+
+    fun safeCalculateToSize(): Int {
+        while (true) {
+            val acquired = lock.tryLock(500, TimeUnit.MILLISECONDS)
+            if (acquired) {
+                try {
+                    return size + subDirs.map { it.safeCalculateToSize() }.sum()
+                } finally {
+                    lock.unlock()
+                }
+            } else {
+                Thread.sleep(500)
+            }
+        }
+    }
+}
+
+
+class DirectoryAns(
+    val name: String,
+    val size: Int,
+    private val lock: ReentrantLock = ReentrantLock(),
+    val subDirs: MutableList<Directory> = mutableListOf()
+) {
+    fun calculateTotalSize(): Int {
+        return lock.withLock {
+            var total = size
+            size + subDirs.map { with(it) {calculateTotalSize()}}.sum()
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+// QUESTION 4: State Hygiene vs. Lock Hygiene
+
+class Ledger(
+    var totalFunds: Int = 10000,
+    private val lock: ReentrantLock = ReentrantLock()
+) {
+    fun withDraw(amount: Int, externalApi: () -> Unit) {
+        lock.withLock {
+            totalFunds -= amount            // Optimistic deduction
+            try {
+                // Simulate unpredictable network logic
+                println("Processing withdrawal of $amount...")
+                externalApi()
+            } catch (e: Exception) {
+                // STATE HYGIENE: We must fix the corrupted state before releasing the lock!
+                totalFunds += amount
+
+                // `also` allows us to print restored balance inline before throwing
+                totalFunds.also {
+                    println("CRITICAL FAULT: Rolled back. Funds restored to $it")
+                    throw e
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
 
 
 
@@ -626,8 +816,98 @@ WHY THE ID ORDER FIXES IT
 
 
 
+
+
+
+
+
+
 /* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
 /* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/*
+    In Kotlin, an input parameter with the type `() -> String` is known as a
+    FUNCTION TYPE. It essentially means the function doesn't take a value (like
+    an `Int` or a `String`) but rather a "block of code" or a behavior that
+    can be executed later. The empty parentheses `()` indicate that this piece
+    of code takes no arguments, and the `String` after the arrow indicates that
+    whenever this code is eventually run, it must return a `String`. This is a
+    core part of "Higher-Order Functions," allowing you to pass logic around
+    just as easily as you would pass a variable.
+
+    Inside the receiving function, you treat that parameter like a local name
+    for the code block. To actually run the code and get the String out of it,
+    you simply add parentheses to the parameter name, like `parameterName()`, or
+    use the `.invoke()` method. This is incredibly useful for LAZY EXECUTION:
+    the code inside the `() -> String` block doesn't run the moment you pass
+    it into the function; it only ruins exactly when (and if) the function
+    decides to call it. This is why you often see this used in logging or UI
+    libraries, where you only want to build a complex string if a certain
+    condition is met.
+
+
+
+    ---
+    `withLock { ... }` or `with(user) { ... }`, the code inside those curly
+    braces is essentially a function of the type `() -> T` (a "lambda") being
+    passed as an argument. However, there is one tiny but powerful distinction
+    when we talk about things like `with` or `apply`: the RECEIVER.
+
+
+THE "FUNCTION TYPE" vs. "FUNCTION LITERAL WITH RECEIVER"
+    While `() -> String` is a standard function, Kotlin often uses
+    `Context.() -> String`. This is called a FUNCTION LITERAL WITH RECEIVER.
+        - STANDARD (`() -> String`): You just call it. It doesn't know anything
+          about the object it's inside of.
+        - WITH RECEIVER (`Account.() -> Unit`): Inside the curly braces, the
+          keyword `this` now refers to the `Account` object. This is how Kotlin
+          creates "DSL" (Domain Specific Language) vibes, letting you call
+          methods like `balance += 100` directly without typing
+          `account.balance`.
+
+
+WHY THE SYNTAX LOOKS "BUILT-IN"
+    Kotlin has a rule called TRAILING LAMBDA SYNTAX. If the very last parameter
+    of a function is a function type (like your `() -> String`), you can move
+    the curly braces OUTSIDE the parentheses.
+
+```Kotlin
+// Instead of this:
+lock.withLock({ println("Locked!") })
+
+// You can do this:
+lock.withLock {
+    println("Locked!")
+}
+```
+
+    It makes the function look like a built-in language keyword (like `if` or
+    `while`), even though it's just a regular function taking a block of
+    code as an input. Since you're working with ROS2 and Isaac Sim, you'll see
+    this everywhere in configuration scripts and node setups--it's what makes
+    the code look "clean" despite having complex logic underneath.
+
+* */
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+/* ---- ----    ----    ----    ----    ----    ----    -----   ----    ----*/
+
+
+
+
+
+
 
 
 
