@@ -201,7 +201,99 @@ KEY TRICKS, INSIGHTS, AND TECHNIQUES TO LEARN
 
 /*
     ... a fantastic question, and a verh sharp architectural hunch! ... thinking
-    like a senior
+    like a senior right now: "Why are we passing a function around when OOP has
+    interfaces and inheritance?"
+
+    It is absolutely true that you could try to design this using a `val` of the
+    superclass/interface type. However, if you try to build a hashmap that way,
+    you will immediately crash into two massive brick walls.
+
+    ... why your idea is incredibly tempting, but why the Factory Pattern (the
+    lambda) is ultimately required for this specific data structure.
+
+
+---
+THE PROBLEM WITH `val bucket: CustomMutableMap<K, V>`
+    Imagine you redesigned the constructor to take a single instance of a bucket
+    instead of a function, like this:
+
+```Kotlin
+abstract class GenericHashmap<K, V> {
+    private val bucketTemplate: CustomMutableMap<K, V>  // Using an interface val
+}
+```
+
+
+BRICK WALL 1: THE "SHARED MEMORY" TRAP
+    When you first build your hashmap, you need an array of 32 buckets. If you
+    write:
+
+```Kotlin
+private var buckets = Array(32) { bucketTemplate }
+```
+    You did not just create 32 empty buckets. You put the EXACT SAME BUCKET
+    OBJECT into all 32 slots. If a collision happens and you put
+    `(Key A, Value 1)` into `buckets[0]`, it will magically appear in
+    `buckets[1]`, `buckets[2]`, and ... because they all point to the exact same
+    memory address. Your entire hashmap devolves into one giant slow list.
+
+
+
+BRICK WALL 2: THE "GHOST INSTANTIATION" PROBLEM
+    To fix Brick Wall 1, you realise you need 32 distinct, separate buckets. You
+    also need to create brand new buckets whenever the hashmap exceeds its load
+    factor and calls `resize()`.
+
+    But how do you create a new one? You cannot write this:
+
+```Kotlin
+val newBucket = CustomMutablemap<K, V>()
+```
+    You cannot instantiate an interface. The compiler says, "Wait, do you want
+    a ListBasedMap? An ArrayBasedMap? I odon't know how to build a generic
+    CustomMutableMap!"
+
+    "Are there other ways besides the Factory Lambda?" ... Yes! The Factory
+    Lambda is not the only way, but it is the cleanest. Here are the other ways
+    you could solve it without a lambda, and why they are usually worse:
+
+
+1. THE "PROTOTYPE" PATTERN
+    - HOW IT WORKS: `bucketTemplate.clone()`
+    - WHY IT'S WORSE: Kotlin doesn't have a clean, universal `.clean()`
+      interface for custom collectons. You would have to force every map you
+      write to implement a custom `copy()` method.
+
+2. REFLECTION (The Java Way)
+    ...
+
+3. THE ENUM FLAG (The Beginner Way)
+    You pass a variable telling the map which one to build.
+    - HOW IT WORKS: `if (type == "LIST") ListBasedMap() else ArrayBasedMap()`
+    - WHY IT'S WORSE: This violates the Open-Closed Principle. If you invent a
+      `TreeBasedMap` next week, you have to open up the `GenericHashmap` file
+      and modify its `if/else` logic to support your new invention.
+
+
+WHY THE LAMBDA IS "KOTLIN MAGIC"#
+    By passing `() -> CustomMutableMap<K, V>`, you give the `GenericHashmap` an
+    infinite, free supply of new buckets. The Hashmap doesn't know how they are
+    built, and it doesn't share memory between them. Every time it calls that
+    function, a brand new bucket pops out.
+
+    ...
+
+
+
+
+
+
+
+
+
+
+
+---
 
 
 
@@ -252,6 +344,11 @@ KEY TRICKS, INSIGHTS, AND TECHNIQUES TO LEARN
         - INVERSION OF CONTROL: The responsibility of "how to build a bucket" is
           moved outside of the hash map and given to whoever initializes the
           class.
+
+
+
+
+---
 
 * */
 
