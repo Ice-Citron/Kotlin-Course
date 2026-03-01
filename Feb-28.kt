@@ -348,8 +348,13 @@ WHY THE LAMBDA IS "KOTLIN MAGIC"#
 
 
 
----
+--- The Open-Closed Principle (OCP) states that software entities (classes,
+    modules, functions) should be OPEN for EXTENSION but CLOSED for modification
+    . Introduced... it means you can add new functionality by adding new code,
+    rather than changing existing, tested code. This reduces risk of regression
+    and improves maintainability.
 
+    ...
 * */
 
 
