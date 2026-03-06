@@ -148,10 +148,50 @@ THE "AHA!" MOMENT
    * APPLICATIONS: Ideal for sliding window problems, scheduling algorithms, and
      palindrome checks.
 
+* */
+
+/* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
+/* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
+/*
+    In this context, `>>` is the BITWISE RIGHT SHFIT operator.
+
+    ... mathematically it looks like "significantly greater than," but in
+    programming, it is used to move the individual bits of a number to the
+    right.
 
 
+THE "COLOR" PACKING" CONTEXT
+    In many computer system (like the one in your lab), a single `int` is used
+    to store an entire color. Since an `int` has 32 bits, it "packs" the Red,
+    Green, and Blue values inside is like this:
+
+    Bits 31-24 // Bits 23-16 // Bits 15-8 // Bits 7-0
+    Alpha (Transparency) // RED // GREEN // BLUE
 
 
+WHAT `>>` IS DOING HERE
+    To get the individual colors back out of that one big number, you have to
+    "shift" the bits so that the color you want moves into the last 8 positions
+    (the 0-255 range).
+
+    1. BLUE (`rgb & 0xff`): Blue is already at the very end. We don't shift at
+       all. We just use `& 0xff` to ignore everything else.
+    2. GREEN (`rgb >> 8`): We shift the bits 8 places to the right. This
+       "pushes" the Blue bits off the edge and moves the Green bits into the
+       "Blue slot".
+
+
+...
+
+WHY THE `& 0xff`?
+    After you shift, there might still be some "Alpha" bits hanging around to
+    the left of your color. The `& 0xff` (which is `11111111` in binary) acts
+    like a MASK. It says: "Only keep the last 8 bits and turn everything else to
+    zero."
+
+    SUMMARY: `>>` is a way of "extracting" pieces of data that are crammed into
+    a single number. It is must faster for a CPU to do this than to perform
+    division or more complex math!
 
 
 
@@ -161,6 +201,110 @@ THE "AHA!" MOMENT
 
 
 * */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
+/* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
+/* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
+/* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
+/* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
+
+
 
 
 
