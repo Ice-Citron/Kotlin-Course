@@ -63,13 +63,78 @@ public V get(K key) {
 
 
 
+*/
 
 
 
 
+/*
+    Atomic properties in Kotlin (and Java) are special variables that guarantees
+    ATOMICITY, meaning operations on them happen as a single, indivisible unit.
+    In a multi-threaded environment, they prevent "race conditions" where two
+    threads try update a value at the exact same time, causing data loss.
 
 
+1. WHY ARE THEY USED?
+    Standard variables like `var count = 0` are not thread-safe because an
+    operation like `count++` is actually three separate steps in the CPU:
 
+    1. READ the current value.
+    2. ADD 1 to it.
+    3. WRITE it back to memory.
+
+    If two threads do this simultaneously, they might both read `0` and `1`, and
+    both write `1` back, losing one of the increments. Atomic types solve this
+    by performing all three steps as one "locked" operation at the hardware
+    level.
+
+
+2. HOW ARE THEY USED?
+   In Kotlin, you typically use the Java `java.util.concurrent.atomic` classes.
+
+   EXAMPLE: A Thread-Safe Counter
+```Kotlin
+import java.util.concurrent.atomic.AtomicIntegers
+
+class Analytics {
+    // Instead of var count = 0
+    private val visitorCount = AtomicInteger(0)
+
+    // Atomic increment (Thread-safe)
+    fun increment() = visitorCount.incrementAndGet()
+
+    fun getCount(): Int = visitorCount.get()
+}
+```
+
+
+3. WHEN TO USE THEM
+    - SIMPLE COUNTERS/FLAGS: Use them for shared counters, IDs, or boolean
+      status flags (e.g., `AtomicBoolean`).
+    - HIGH PERFORMANCE: Use them when you want thread safety without the heavy
+      overhead of a full `Lock` or `synchronized` block. They use "Lock-Free"
+      algorithms that are much faster for simple data.
+    - REFERENCE SWAPPING: Use `AtomicReference<T>` if you need to atomically
+      update an entire object.
+
+
+4. WHEN NOT TO USE THEM
+    - MULTIPLE RELATED VARIABLES: If you need to update two different variables
+      together (e.g., updating a `Latitude` and `Longitude` at the same time),
+      atomics won't help. You need a `Lock` or your `LockedMap` structure to
+      ensure the whole brick is protected.
+    - COMPLEX LOGIC: If you have to check a condition, then do a calculation,
+      then update (Check-Then-Acts), simple atomics can still have race
+      conditions between the "check" and the "act".
+    - LOCAL VARIABLES: Don't use them for variables only used by a single
+      thread; it adds unnecessary performance costs.
+
+
+    ---
+    Feature // Atomic Types // Locks (like `LockedMap`)
+    SCOPE // Single Variable // Entire code blocks or collections
+    SPEED // Very Fast (Hardware level) // Slower (Software overhead)
+    COMPLEXITY // Simple values only // Any complex logic
 
 
 
@@ -84,3 +149,56 @@ public V get(K key) {
 
 
 * */
+
+
+
+
+
+
+
+
+
+/*
+    ... A Tree-Based Map is a completely different way of organising data.
+
+
+1. VISUALISING A SINGLE NODE
+    In your Hash Map, a node in your linked list just held a `ValueNode` or a
+    generic `Entry`. In a Tree-Based Map, every single "node" (or circle) in
+    the tree holds a specific package: A KEY-VALUE PAIR.
+        - EXAMPLE NODE: `[Key: "Charlie", Value: 21]`
+
+
+2. VISUALISING THE TREE SHAPE (The Sorting Rule)
+    Imagine an upside-down tree. You start at the top (the Root node) and branch
+    downwards. The tree builds itself using one strict rule based ONLY ON THE
+    KEYS:
+    - Any key that is "smaller" (e.g., alphabetically earlier) goes to the LEFT.
+    - Any key that is "larger" (e.g., alphabetically larger) goes to the RIGHT.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+*/
+
