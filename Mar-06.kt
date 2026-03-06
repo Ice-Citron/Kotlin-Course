@@ -201,7 +201,92 @@ WHY THE `& 0xff`?
 
 
 * */
+/* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
+/* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
+/*
+    Implementing the `PictureProcessor.main` method involves two primary
+    responsibilities: PARSING THE COMMAND-LINE ARGUMENTS (`String[] args`) to
+    identify the requested operation and its parameters, and COORDINATING THE
+    IMAGE PROCESSING by invoking the appropriate methods in the `Picture` class.
 
+
+1. UNDERSTANDING `String[] args`
+    When you run a Java program from the terminal, any text you type after the
+    class name is automatically bundled into the `args` array.
+
+        * INDEXING: `args[0]` is always the first word after the class name (the
+          command).
+        * PARSING: You use standard array indexing to access these strings. For
+          example, in `invert <output> <output>`, `args[1]` is the input path
+          and `args[2]` is the output path.
+
+
+2. RECOMMENDED PROGRAM STRUCTURE
+    To keep your code organised, follow the "suggested design" from the spec:
+    keep parsing logic in `main` and transformation logic inside the `Picture`
+    class.
+
+    Inside `PictureProcessor.java`:
+
+```java
+    public static void main(String[] args) {
+        if (args.length == 0) return;
+
+        String command = args[0];       // e.g., "rotate"
+
+        // Use a switch statement to handle different commands
+        switch (command) {
+            case "invert":
+                // invert <input> <output>
+                Picture pic = new Picture(args[1]);     // Load
+                pic.invert();
+                pic.saveAs(args[2]);
+                break;
+
+            case "rotate":
+                // rotate <angle> <input> <output>
+                int angle = Integer.parseInt(args[1]);
+                Picture toRotate = new Picture(args[2]);
+                // If rotating changes dimension, you might need a helper that
+                // returns a new Picture
+                Picture rotated = toRotate.rotate(angle);
+                break;
+
+            // Add cases for grayscale, flip, blend, and blur...
+        }
+    }
+```
+
+
+3. HANDLING TOOL CALLS & PARAMETER EXTRACTION
+    To use `args` effectively for different tool-like functionalities, you must
+    account for VARIABLE PARAMETER COUNTS:
+        * FIXED PARAMETERS: For `invert`, you know exactly where the input and
+          output live (`args[1]` and `args[2]`).
+        * VARIABLE PARAMETERS (`blend`): The `blend` command can have any number
+          of input images. You would parse it by taking everything from
+          `args[1]` up to `args[args.length - 2]` as inputs, and
+          `args[args.length - 1]` as the output destination.
+        * VALIDATION: Professional implementations check `args.length` before
+          accessing an index to prevent `ArrayIndexOutOfBoundsException`.
+
+
+4. SUMMARY CHECKLIST FOR YOUR WORKFLOW
+
+    1. SKELETON: Create the `switch` block in `PictureProcessing.main` to catch
+       all possible command strings (invert, grayscale, etc.).
+    2. STUBS: Create corresponding empty methods in `Picture.java` (e.g.,
+       `public void invert()`) so your `main` method can compile.
+    3. IMPLEMENTATION: Fill in the pixel-processing logic for each
+       transformation one by one.
+    4. TESTING: Run the provided `PictureProcessorTest` frequently to ensure
+       each command works as expected.
+
+
+
+
+
+* */
 
 
 
