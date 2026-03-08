@@ -313,7 +313,147 @@ WHY THE `& 0xff`?
 
 /* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
 /* ---- ----    ----    ----    ----    ----    ----    ----    ----    ---- */
+/*
+    ... the MOSAIC extension is a fantastic math puzzle dressed up as an
+    image-processing task, and the KOTLIN REWRITE is the perfect capstone to
+    everything you've learned this term.
 
+    ... walkthrough of how to architect and implement both extensions so you
+    can see how they work.
+
+
+---
+1. THE MOSIAC EXTENSION (The "Aha!" Math Moment)
+    The hardest part of this extension isn't copying the pixels; it's figuring
+    out which picture to pull from for a given tile.
+
+    The brief states: "For every tile, the neighbouring tiles to the east
+    (right) and south (down) come from the next picture in the list (wrapping
+    round)."
+
+    If we treat our image as a grid of tiles (where the top-left tile is column
+    `0`, row `0`), we can represent the picture index using simple modulo
+    arithmetic. If we use the formula `(tileX + tileY) % numberOfPictures`,
+    watch what happens for 3 pictures (indices 0, 1, 2):
+
+       ...
+       `(0 + 0) % 3` = 0
+       `(1 + 0) % 3` = 1
+       `(0 + 1) % 3` = 1
+       `(1 + 1) % 3` = 2
+       `(2 + 1) % 3` = 0            (Wraps around - Picture A)
+
+    This perfectly matches the matrix example...
+
+
+---
+THE IMPLEMENTATION IN `Picture.java`
+    Here is how you would write this as a static method. Notice how we use
+    Java's integer division to perfectly "trim" the edge of the canvas!
+
+```Java
+    public static Picture mosaic(List<Picture> pictures, int tileSize) {
+        if (pictures == null || pictures.isEmpty()) {
+            throw new IllegalArgumentException("Must provide at least one picture");
+        }
+
+        // 1. Find the absolute minimum width and height across all pictures
+        int minWidth = pictures.stream().mapToInt(Picture::getWidth).min().getAsInt();
+        int minHeight = pictures.stream().mapToInt(Picture::getHeight).min().getAsInt();
+
+        // 2. Trim dimensions to be a perfect multiple of the tile size.
+        //    Integer division chops off decimals. e.g., (65 / 20) * 20 = 3 * 20 = 60
+        int finalWidth = (minWidth / tileSize) * tileSize;
+        int finalHeight = (minHeight / tileSize) * tileSize;
+
+        // 3. Create the blank canvas for the output
+        Picture canvas = new Picture(finalWidth, finalHeight);
+        int numPics = pictures.size();
+
+        // 4. Iterate over the grid tile by tile
+        for (int tileX = 0; tileX < finalWidth / tileSize; tileX++) {
+            for (int tileY = 0; tileY < finalWidth / tileSize; tileY++) {
+
+                // Use the magic formula to determine which picture owns this tile
+                int picIndex = (tileX + tileY) % numPics;
+                Picture sourcePic = pictures.get(picIndex);
+
+                // 5. Paint the pixels for this specific tile
+                for (int x = tileX * tileSize; x < (tileX + 1) * tileSize; x++) {
+                    for (int y = tileY * tileSize; y < (tileY + 1) * tileSize; y++) {
+                        canvas.setPixel(x, y, sourcePic.getPixel(x, y));
+                    }
+                }
+            }
+        }
+
+        return canvas;
+    }
+```
+
+
+---
+WIRING IT UP IN `PictureProcessor.java`
+
+    To run this from the command line, you add another `case` to your `switch`
+    statement in `main()`. The command layout is:
+    `mosaic <tile_size> <input_1> ... <input_n> <output>`
+
+```
+case "mosaic":
+    // The tile size is the first argument after the command name
+    int tileSize = Integer.parseInt(args[1]);
+
+    List<Picture> mosaicPics = new ArrayList<>();
+
+    // We start parsing at index 2 (skipping "mosaic" and "tileSize")
+    // We stop before the last index (which is reserved for the output )
+    for (int i = 2; i < args.length - 1; i++) {
+        mosaicPics.add(new Picture(args[i]));
+    }
+
+    // Perform the transform and save!
+    Picture finalMosaic = Picture.mosaic(mosaicPics, tileSize);
+    finalMosaic.saveAs(args[args.length - 1]);
+    break;
+```
+
+
+
+
+    ...
+
+C. EXTENSION FUNCTIONS OVER "HELPER" METHODS
+    In Java, if you wanted to add a `blur()` method, you had to physically edit
+    the `Picture.java` source file. What if `Picture.java` was a read-only
+    library file you downloaded from the internet? You'd be stuck!
+
+    In Kotlin, you would use EXTENSION FUNCTIONS to add methods to the class
+    from the outside, keeping the core class small and clean:
+```
+fun Picture.invert() {
+    for (x in 0 until width) {
+        for (y in 0 until height) {
+            val p = this[x, y]
+            this[x, y] = Color(255 - p.red, 255 - p.green, 255 - p.blue)
+        }
+    }
+}
+```
+
+
+D. Stream API vs. Collections
+    Look at how you had to find the minimum width in Java using Streams:
+```Java
+int minWidth = pictureList.stream().mapToInt(Picture::getWidth).min().getAsInt();
+```
+
+    In Kotlin, you just type:
+```Kotlin
+val minWidth = pictureList.minOf { it.width }
+```
+
+* */
 
 
 
