@@ -290,7 +290,11 @@ abstract class MuseumSite(
 }
 
 
-class MuseumRoom(name: String, val capacity: Int) : MuseumSite(name) {
+class MuseumRoom(
+    name: String,
+    val capacity: Int,
+    val exits: MutableSet<MuseumRoom> = mutableSetOf(),
+) : MuseumSite(name) {
     init {
         require(capacity > 0) { "Capacity must be positive" }
     }

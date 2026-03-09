@@ -129,9 +129,23 @@ class Museum(
         val reachable = mutableSetOf<MuseumRoom>()
         val queue = ArrayDeque<MuseumRoom>()
 
-        queue.
+        queue.add(entrance)
+        reachable.add(entrance)
+
+        while (queue.isNotEmpty()) {
+            val curr = queue.removeFirst()
+            for (dest in getTurnstiles(curr)) {
+                if (dest is MuseumRoom && reachable.add(dest)) queue.add(dest)
+            }
+        }
+
+        val unreachable = rooms - reachable
+        if (unreachable.isNotEmpty())
+            throw UnreachableRoomsException(unreachable)
     }
 }
+
+
 
 
 
@@ -139,7 +153,10 @@ class Museum(
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
 
 
-
+// Exception Formatting:
+class UnreachableRoomsException(rooms: Set<MuseumRoom>) :
+    Exception("Unreachable: " +
+            "${rooms.map { it.name }.sorted().joinToString(", ")}")
 
 
 
@@ -230,7 +247,70 @@ WHY ITERABLES MATTER FOR YOUR LAB
 
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+fun bfs(start: MuseumRoom) {
+    val queue = ArrayDeque<MuseumRoom>()
+    val visited = mutableSetOf<MuseumRoom>()
 
+    queue.add(start)
+    visited.add(start)
+
+    while (queue.isNotEmpty()) {
+        val current = queue.removeFirst()   // Get the oldest added item
+
+        // Process the room (e.g., add to a list)
+        println(current.name)
+
+        // Get all rooms this room leads to
+        for (neighbor in current.exits) {
+            if (neighbor !in visited) {
+                visited.add(neighbor)
+                // queue.addLast()
+            }
+        }
+    }
+}
+
+val visited = mutableSetOf<MuseumRoom>()
+
+fun dfs(current: MuseumRoom) {
+    if (current in visited) return
+
+    visited.add(current)
+    println(current.name)       // Process room
+
+    for (neighbor in current.exits) {
+        dfs (neighbor)
+    }
+}
+
+fun dfsWithStack(start: MuseumRoom) {
+    // 1. Create the Stack (LIFO) and the Visited Set
+    val stack = ArrayDeque<MuseumRoom>()
+    val visited = mutableSetOf<MuseumRoom>()
+
+    // 2. Push the starting room onto the stack
+    stack.addLast(start)
+
+    while (stack.isNotEmpty()) {
+        // 3. Pop the most recently added item
+        val current = stack.removeLast()
+
+        // 4. If we haven't seen this room yet, process it
+        if (current !in visited) {
+            visited.add(current)
+            println(current.name)   // Or check for "Outside" here
+
+            // 5. Push all neighbours onto the stack
+            //    Note: To match the exact order of recursion
+            //          you would push neighbours in reverse order
+            for (neighbor in current.exits) {
+                if (neighbor !in visited) {
+                    stack.addLast(neighbor)
+                }
+            }
+        }
+    }
+}
 
 
 
