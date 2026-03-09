@@ -262,7 +262,7 @@ fun checkWellFormed() {
 
 abstract class MuseumSite(
     val name: String,
-    private val lock: ReentrantLock = ReentrantLock(),
+    val lock: ReentrantLock = ReentrantLock(),
     val condition: Condition = lock.newCondition()      // For PatientVisitors (Extension)
 ) {
     // init {                      // 1. Constructor Validation
