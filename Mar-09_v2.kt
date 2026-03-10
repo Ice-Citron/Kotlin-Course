@@ -343,7 +343,44 @@ enum class TicketType(val price: Double) {
 
 
 2. SEALED CLASSES (The "Enum on Steroids")
-    A `sealed class` is used when you have a strict
+    A `sealed class` is used when you have a strict, finite set of TYPES
+    (subclasses). Unlike enums, the subclasses of a sealed class can be entirely
+    different from each other. Some can be standard objects, some can be data
+    classes holding unique variables, and you can create multiple unique
+    instances of them!
+* */
+sealed class MuseumEvent {
+    // An object: Just a simple constant (like an enum)
+    object MuseumOpened : MuseumEvent()
+
+    // A data class: holds specific state/data for this exact event!
+    data class VisitorEntered(
+        val visitorName: String,
+        val roomName: String,
+    ) : MuseumEvent()
+
+    // Another data class with completely different parameters
+    data class RoomReachedCapacity(
+        val roomName: String,
+        val waitingCount: Int
+    ) : MuseumEvent()
+}
+/*
+    WHEN TO USE THEM:
+        * When the result of an operation can be drastically different things
+          (e.g., a network call returning `Success(val data: String)` or
+          `Error(val code: Int, val message: String)`).
+        * When you want to use a `when` statement and have the compiler force
+          you to handle every possible subclass, making your code incredibly
+          safe.
+
+
+
+    THE GOLDEN RULE SUMMARY
+        * Use `enum class` if you just need a list of simple, static constants
+          that all share the exact same properties.
+        * Use `sealed class` if your options need to hold different type of data
+          , or if you need to create multiple unique instances of those options.
 * */
 
 
@@ -353,10 +390,38 @@ enum class TicketType(val price: Double) {
 
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+data class VisitorBadge(
+    val visitorName: String,
+    val idNumber: Int,
+)
+
+/*
+fun main() {
+    val vb1 = VisitorBadge("Neha", 101)
+    val vb2 = VisitorBadge("Neha", 101)
+    val tbSet: MutableSet<VisitorBadge> = mutableSetOf()
+    tbSet.add(vb1)
+    println("${tbSet.contains(vb2)}")
+}
+ */
 
 
+enum class TurnstileDirection(val occupancyChange: Int) {
+    INBOUND(1),
+    OUTBOUND(-1),
+}
 
+sealed class TurnstileAttempt {
+    data class Success(
+        val destinationRoom: MuseumRoom
+    ) : TurnstileAttempt()
 
+    data class FailedRoomFull(
+        val estimatedWaitTime: Long
+    )
+
+    object MuseumClosed: TurnstileAttempt()
+}
 
 
 
