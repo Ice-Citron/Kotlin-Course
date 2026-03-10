@@ -217,7 +217,21 @@ val brightnessCategory = when (pixelIntensity) {
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
 /*
-    ... think of
+    ... think of `when` as having two distinct "modes" depending on whether you
+    put something in the parentheses:
+
+MODE 1: PATTERN MATCHING (Has an argument)
+    * SYNTAX: `when (variable) { ... }`
+    * WHAT IT DOES: It looks at the variable and tries to match it against
+      patterns (exact values, ranges like `in 1..10`, or types like `is String`)
+
+MODE 2: THE `if-else` REPLACEMENT (No argument)
+    * SYNTAX: `when { ... }`
+    * WHAT IT DOES: It just evaluates a list of boolean conditions from top to
+      bottom, exactly like a chain of `if () ... else if () ... else`.
+
+
+    ...
 * */
 
 
@@ -235,7 +249,58 @@ val brightnessCategory = when (pixelIntensity) {
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
 /*
 3. Checking Multiple Values at Once
+    If multiple cases could trigger the exact same code, you can group them
+    together using a comma `,`.
 * */
+val color = "Red"
+
+fun color255(): Unit {
+    when (color) {
+        "Red", "Green", "Blue" -> println("This is a primary RGB color!")
+        "Cyan", "Magenta", "Yellow" -> println("This is a secondary color.")
+        else -> println("Just a regular color.")
+    }
+}
+
+
+
+/*
+4. CHECKING RANGES USING `in`
+    You can check if a number falls within a specific range, which is super
+    useful for things like image processing thresholds or grading systems.
+* */
+val score271: Int = 85
+
+fun score271() {
+    when (score) {
+        in 90..100 -> println ("A")
+        else -> println("Asian parents: Why you no doctor yet. " +
+                        "Needs improvement!")
+    }
+}
+
+
+
+/*
+...
+
+6. CHECKING TYPES USING `is`
+    If you don't know exactly what type of object you are dealing with, `when`
+    can check the type and automatically "smart cast" it for you.
+* */
+fun printInfo(data: Any) {
+    when (data) {
+        is String -> { println("It is a string of length ${data.length}") }
+        is Int -> {}
+        is Boolean -> {}
+        else -> println("Unknown type")
+    }
+}
+
+
+
+
+
 
 
 
@@ -246,9 +311,40 @@ val brightnessCategory = when (pixelIntensity) {
 
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
 /*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+/*
+    ... breakdown of `enum class` vs. `sealed class` in Kotlin.
+
+    Think of them as two different ways to restrict your data so that the
+    compiler (and the `when` statement) knows exactly all the possible options
+    that can ever exist.
+
+
+1. ENUM CLASSES (The "Fixed Constants")
+    An `enum class` is used when you have a strict, finite set of identical
+    VALUES. Every item in an enum is the exact same type of thing, and they all
+    have the exact same properties. They are essentially singletons.
+* */
+enum class TicketType(val price: Double) {
+    ADULT(15.0),
+    CHILD(5.0),
+    SERNIOR(10.0),
+}
+
+/*
+    WHEN TO USE THEM:
+        * When the options are simple and never change (e.g., Days of the week,
+          Compass directions, User Roles).
+        * When every option has the exact same structure (e.g., every
+          `TicketType` has a `price`).
+        * THE LIMITATION: You cannot create new instances of `ADULT` with
+          different data. `TicketType.ADULT` is a single, hardcoded object in
+          memory.
 
 
 
+2. SEALED CLASSES (The "Enum on Steroids")
+    A `sealed class` is used when you have a strict
+* */
 
 
 
