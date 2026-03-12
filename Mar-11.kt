@@ -166,6 +166,43 @@ PART 2: THE JAVA `Thread` CRASH COURSE
         has completely finished its `run()` method and died." By looping through
         and joining all of them, you guarantee the `finalStore` isn't returned
         until every single concurrent program is fully finished.
+* */
+
+
+
+/*  ----    ----    ----    ----    ----    ----    ----    ----    ----    */
+/*
+THIS IS ABOUT "CLIENTS OF *** CLASS"
+
+    Whenever an Object-Oriented Programming spec sheet mentions "CLIENTS OF
+    CLASS," it is just using fancy academic jargon to mean: "ANY OTHER PIECE OF
+    CODE THAT USES THIS CLASS."
+
+    Think of your class as a business offering a service, and the "client" as
+    the customer using that service.
+
+    For example, on page ....
+        "Clients of MultiStringTextFile can call `rebalance` periodically if
+        they have efficiency concerns."
+
+    In the context of this specific lab exam, the "clients" are simply your
+    JUnit Test files (`Question2Tests.kt`) ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
