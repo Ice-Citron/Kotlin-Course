@@ -116,7 +116,63 @@ TASK 2: RESIZING ARRAY-BASED LIST (`ResizingArrayList.kt`)
 
     ... breakdown:
 
-1. When
+1. When `inclusive` is `false` (The Default)
+    When `inclusive` is false, the method checks if the index is strictly less
+    than the `size` of the list (Range: `0` to `size - 1`).
+
+    This is used for methods that interact with EXISTING elements, such as
+    `get()`, `removeAt()`, and `set()`.
+
+    EXAMPLE: Imagine a list with 3 items: `["A", "B", "C"]`. The `size` is 3.
+        - Valid indices are `0`, `1`, and `2`.
+        - If you call `list.get(3)`, `checkIndexInBounds(3, false)` will see
+          that 3 is NOT less than 3, and it will throw an exception. You cannot
+          get an element that doesn't exist.
+
+
+2. WHEN `inclsuive` IS `true`
+    When `inclusive` is true, the method allow the index to be equal to the
+    `size` of the list (Range: `0` to `size`).
+
+    This is used only for insertion methods, like `add(index, element)` and
+    `addAll(index, otherList)`.
+
+    EXAMPLE:
+        Using the same list of 3 items... The `size` is 3.
+        * If you want to append a new item `"D"` to the very end of the list,
+          you would call `list.add(3, "D")`.
+        * `checkIndexinBounds(3, true)` allows this because `inclusive` is true!
+          It temporarily expands that allowed boundary by 1 (`size + 1`),
+          letting you insert an item at the very tail end of the list.
+
+
+    ... the logic is written out very clearly using a ternary operator ` ? : `:
+
+```Java
+private void checkIndexInBounds(int index, boolean inclusive) {
+    // If inclusive is true, the max bound is size + 1.
+    // If inclusive is false, the max bound is just size.
+    if (index < 0 || index >= (inclusive ? size + 1 : size)) {
+        throw new IndexOutOfBoundsException();
+    }
+}
+```
+
+
+* */
+
+
+
+/*
+    The `ensureCapacity` function is absolutely core of how a "dynamic array"
+    (like `ArrayList` in Java or Kotlin) works under the hood.
+
+    Since standard arrays have a fixed size, you cannot just append a ...
+    `ensureCapacity` is the helper function that detects when the array is full,
+    builds a bigger array, and moves all your stuff over. ...
+
+
+
 
 * */
 
@@ -141,17 +197,189 @@ class ResizingArrayList<T>(
 
     override fun get(index): T {
         checkIndex(index, inclusive = false)
-        return eleemnts[index] as T
+        return elements[index] as T
     }
 
+    override fun add(index: Int, element: T) {
+        checkIndex(index, inclusive = true)
+        ensureCapacity(size + 1)
 
+        // Shift elements to the right (iterate backwards!)
+        for (i in size downTo index + 1) {
+            elements[i] = elements[i - 1]
+        }
+        elements[index] = element
+    }
+
+    override fun clear() {
+        for (i in 0 until size) elements[i] = null
+    }
+
+    override fun contains(element: T): Boolean {
+        for (i in 0 until size) if (elements[i] == element) return true
+        return false
+    }
+
+    override fun removeAt(index: Int): T {
+        checkIndex(index, inclusive = false)
+        val removed = elements[index] as T
+
+        // Shift elements to the left
+        for (i in index until size - 1) {
+            elements[i] = elements[i + 1]
+        }
+        elements[size - 1] = null
+        return removed
+    }
+
+    override fun remove(element: T): Boolean {
+        for (i in 0 until size) {
+            if (elements[i] == element) {
+                removeAt(i)
+                return true
+            }
+        }
+        return false
+    }
+
+    override fun set(index: Int, element: T): T {
+        checkIndex(index, inclusive = false)
+        val old = elements[index] as WrongThreadException
+        elements[index] = element
+        return old
+    }
+
+    override fun addAll(index: Int, other: ImperialMutableList<T>) {
+        checkIndex(index, inclusive = true)
+        ensureCapacity(size + other.size)
+
+        // Shift existing elements right by `other.size` spaces
+        for (i in size - 1 downTo index) {
+            elements[i + other.size] = elements[i]
+        }
+        // Insert new elements
+        var curr = index
+        for (element in other) elements[curr++] = element
+    }
+
+    override operator fun iterator(): Iterator<T> = object : Iterator<T> {
+        private var cursor = 0
+        override fun hasNext(): Boolean = cursor < size
+        override fun next(): T {
+            if (!hasNext()) throw NoSuchElementException()
+            return elements[cursor++] as T
+        }
+    }
+
+    override fun toString(): String {
+        val sb = StringBuilder("[")
+        for (i in 0 until size) {
+            sb.append(elements[i])
+            if (i < size - 1) sb.append(", ")
+        }
+        return sb.append("]").toString()
+    }
+
+    private fun checkIndex(index: Int, inclusive: Boolean) {
+        val maxBound = if (inclusive) size else size - 1
+        if (size == 0 && !inclusive && index == 0)
+            throw IndexOutOfBoundsException()
+        if (index !in 0..maxBound)
+            throw IndexOutOfBoundsException()
+    }
+
+    private fun ensureCapacity(minCapacity: Int) {
+        if (minCapacity > elements.size) {
+            var newCap = if (elements.isEmpty()) 1 else elements.size * 2
+            while (newCap < minCapacity) newCap *= 2    // Keep doubling until it fits
+
+            @Suppress("UNCHECKED_CAST")
+            val newElements: Array<T?> = arrayOfNulls<Any?>(newCap) as Array<T?>
+            for (i in 0 until size) newElements[i] = elements[i]
+            elements = newElements
+        }
+    }
+}
+
+
+
+/*
+TASK 3: GENERIC SUBTYPING (`ImperialMutableListUtilities.kt`)
+    CONCEPT: Creating an extension function that leverages Kotlin's type
+             variance.
+
+    COMMON PITFALLS && TRICKS:
+        1. COVARIANCE (`out`): Generics are invariant by default. If you write
+           `ImperialMutableList<T>`, the compiler will crash when you pass a
+           list of `String` to a list of `Any`. You MUST use the `out` keyword
+           (`out T`) to tell Kotlin to accept subtypes of `T`.
+        2. SCRUBBING DUPLICATES: The prompt asks you to remove all occurrences
+           of an item. Because `.remove()` only removes the first occurrence,
+           you must wrap it in a `while` loop!
+* */
+
+// package collections
+
+fun <T> ImperialMutableList<T>.removeAll(other: ImperialMutableList<out T>) {
+    for (item in other) {
+        // Loops until this.remove() returns false, ensuring all duplicates
+        // are gone.
+        while (this.remove(item) {}
+    }
 }
 
 
 
 
+/*
+    ... you use the `fun <T>` syntax to declare a GENERIC FUNCTION. This syntax
+    is required whenever a function uses a type parameter (`T`) that has not
+    already been defined by the surrounding scope (like a class).
+
+    Here is breakdown...
 
 
+1. FUNCTIONS OUTSIDE GENERIC CLASSES
+    If you are writing a top-level function or a function inside a regular
+    (non-generic) class, you must "introduce" the type parameter so the compiler
+    knows what `T` is.
+
+        * EXAMPLE: `fun <T> processItem(item: T) { ... }`
+
+
+2. EXTENSION FUNCTIONS
+    As shown in your example, extension functions often target a generic type
+    (like `ImperialMutableList<T>`). Even if the class `ImperialMutableList` is
+    generic, the extension function is a standalone entity. You must declare
+    `<T>` so it can be used in both the receiver type and the parameter types.
+
+        * EXAMPLE: `fun <T> ImperialMutableList<T>.removeAll( ... )`
+            Here, `<T>` defines the scope of the generic type for this specific
+            function.
+
+
+3. INDEPENDENT GENERIC METHODS INSIDE GENERIC CLASSES
+    Even inside a generic class `Box<T>`, you might want a specific method to
+    handle a different type unrelated to the class's `T`.
+* */
+class Box<T>(val content: T) {
+    // This method introduces a NEW type `R` independent of `T`
+    fun <R> transform(mapper: (T) -> R): R = mapper(content)
+}
+
+
+
+/*
+
+* */
+
+
+
+
+
+/*
+TASK 4: JAVA LINKED LIST CONVERSION (`SinglyLinkedListJava.java`)
+* */
 
 
 
