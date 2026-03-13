@@ -1,3 +1,5 @@
+import java.util.concurrent.atomic.AtomicInteger
+
 /*
     ... seamlessly bridge LOW-LEVEL DATA STRUCTURE MEMORY MANAGEMENT, KOTLIN
     GENERIC VARIANCE (subtyping), Java-to-Kotlin interoperability, and
@@ -370,7 +372,18 @@ class Box<T>(val content: T) {
 
 
 /*
+    SUMMARY CHECKLIST:
+        You need `fun <T>` if:
+            * The function is NOT inside a generic class that already defines
+              `T`.
+            * The function IS inside a generic class, but you want to use a
+              NEW type parameter (like `<U>` or `<R>`).
+            * You are writing an EXTENSION FUNCTION on a generic type.
 
+        NOTE ON VARIANCE: In your snippet, `other: ImperialMutableList<out T>`
+        uses "declaration-site variance" (the `out` keyword). This allows the
+        function to accept a list of a subtype of `T`, making your generic
+        function more flexible.
 * */
 
 
@@ -379,7 +392,179 @@ class Box<T>(val content: T) {
 
 /*
 TASK 4: JAVA LINKED LIST CONVERSION (`SinglyLinkedListJava.java`)
+    CONCEPT: Porting Kotlin null-safety logic directly into strict Java logic.
+
+    COMMON PITFALLS && TRICKS:
+        1. NULL-SAFETY: Kotlin's `==` automatically checks for nulls securely.
+           In Java, if `T` can be null, using `current.element.equals(element)`
+           throws a `NullPointerException`. Handle this safely by importing and
+           using `java.util.Objects.equals(a, b)`.
+        2. `ImperialPair`: The skeleton gives you `traverseTo(index)` which
+           returns an `ImperialPair<Previous, Current>`. Use `pair.getFirst()`
+           and `pair.getSecond()` to quickly grab the nodes and avoid rewriting
+           boilerplate iteration logic.
+        3. TRACKING SIZE: Java doesn't have custom property setters. You have
+           to manually type `size++;` and `size--;`.
+
+    CODE:
+
+    ...
+
+```Java
+
+    @NotNull
+    @Override
+    public Iterator<T> iterator() {
+        return new Iterator<T>() {
+            private Node<T> current = head;
+
+            @Override
+            public boolean hasNext() { return current != null; }
+
+            @Override
+            public T next() {
+                if (!hasNext()) throw new NoSuchElementException();
+                T result = current.element;
+                current = current.next;
+                return result;
+            }
+        }
+    }
+```
 * */
+
+
+
+
+/*
+TASK 5: DEBUGGING `Hashmap.kt`
+
+    CONCEPT: Fixing intentional SWE violations, correctness bugs, and $O(N^2)$
+             algorithmic latency.
+
+    THE 5 BUGS TO FIX:
+        1. PROBLEM (Correctness): `remove()` never decrements `size`.
+           SOLUTION: Add `size--` upon successful removal.
+        2. PROBLEM (Memory Leak): `resize()` iterates over elements and utilises
+           `put()`, which artificially increments `size`. The size variable
+           effectively doubles to infinity on every resize.
+           SOLUTION: Set `size = 0` at the very beginning of the `resize`
+           function before you loop items.
+        3. PROBLEM (Performance): In `put()`, the loop checks to trigger
+           `resize()` when updating an existing key. It should only evaluate at
+           the end when adding a new key.
+           SOLUTION: Move the `if (size > ...)` check to the bottom.
+        4. PROBLEM (O(N^2) Complexity): Using `for (i in 0..<bucket.size)` and
+           doing `val entry = bucket[i]` iterates over a Linked List by index,
+           taking O(N) for every lookup.
+           SOLUTION: Iterate cleanly via `for (entry in bucket)`
+        5. PROBLEM (SWE): Internal implementation properties are exposed.
+           SOLUTION: Add the `private` visibility modifier to `buckets`,
+           `bucketIndex`, `bucket`, `resize`, and `helperMethod`. Rename
+           `helperMethod` to `getAllEntries`.
+
+
+
+
+
+* */
+
+
+/*
+TASK 6: THREAD-SAFE `StripedHashmap.kt`
+
+    CONCEPT: Implement a high-performance hashmap using concurrency striping.
+
+    COMMON PITFALLS && TRICKS:
+        1. MATHEMATICAL INDEXING RULES: The number of bucket doubles, but the
+           number of locks never doubles. You must use
+           `Math.floorMod(hashCode, locks.size)` to find your lock... find your
+           bucket.
+        2. `AtomicInteger`: Standard `Int` gets destroyed in concurrency threads
+           . You must use `AtomicInteger(0)`. Read with `.get()`, update wih
+           `.incrementAndGet()` and `.decrementAndGet()`.
+        3. DEADLOCKS in `resize()`: Don't call `put()` inside `resize()`.
+           `put()` checks locks, which will deadlock your thread. Re-hash the
+           buckets manually into a new array.
+        4. GLOBAL LOCKING: When a thread triggers `resize()`, it MUST acquire
+           all 16 locks sequentially (`lock.forEach { it.lock() }`) to pause
+           other threads, and sequentially unlock them in a `finally` block.#
+        5. DOUBLE CHECKED LOCKING: Inside `resize()`, right after getting all
+           locks, ensure you check `if (atomicSize.get() <= ...)` again, in case
+           another thread beat you to the resize while you waited for the
+           locks!
+* */
+
+class StripedHashmap<K, V>(
+    private val bucketFactory: () -> Bucket<K, V>
+) : ImperialMutableList<K, V> {
+
+    private val initialCapacity = 16
+    private var buckets: Array<Bucket<K, V>> =
+        Array(initialCapacity) { bucketFactory() }
+
+    // The lock array MUST NOT resize. It is fixed at 16 locks forever.
+    private val locks: Array<Lock> =
+        Array(initialCapacity) { ReentrantLock() }
+    private val atomicSize = AtomicInteger(0)
+
+    override val size: Int
+        get() = atomicSize.get()
+
+    // Helper functions for safe modulo mapping
+    private fun getLockIndex(key: K): Int =
+        Math.floorMod(key.hashCode(), locks.size)
+    private fun getBucketIndex(key: K, currentCapacity: Int): Int =
+        Math.floorMod(key.hashCode(), currentCapacity)
+
+    override fun iterator(): Iterator<ImperialMutableList.Entry<K, V>> {
+        val entries = SinglyLinkedList<ImperialMutableList.Entry<K, V>>()
+
+        // lock all safely to grab a consistent snapshot
+        locks.forEach { it.lock() }
+        try {
+            for (bucket in buckets) {
+                for (entry in bucket) entries.add(0, entry)
+            }
+        } finally {
+            locks.forEach { it.unlock() }
+        }
+        return entries.iterator()
+    }
+
+    ...
+
+    private fun resize() {
+        // 1. Grab ALL locks sequentially to pause other threads
+        locks.forEach { it.lock() }
+        try {
+            // 2. Double-checked locking in case another thread already resized it
+            if (atomicSize.get() <= buckets.size * MAX_LOAD_FACTOR) return
+
+            val oldBuckets = buckets
+            val newCapacity = oldBuckets.size * 2
+            val newBuckets = Array(newCapacity) { bucketFactory() }
+
+            // 3. Re-hash manually. Do NOT call put(), as we already hold the locks!
+            for (oldBucket in oldBuckets) {
+                for (entry in oldBucket) {
+                    val newIdx = getBucketIndex(entry.key, newCapacity)
+                    newBuckets[newIdx].add(0, entry)
+                }
+            }
+            buckets = newBuckets
+
+        } finally {
+            locks.forEach { it.unlock() }
+        }
+    }
+}
+
+
+
+
+
+
 
 
 
